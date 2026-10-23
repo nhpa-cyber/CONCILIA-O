@@ -270,14 +270,15 @@ export const Recontagem020502View: React.FC<Recontagem020502ViewProps> = ({
   const handleClear = () => {
     setOver({});
     setHist([]);
+    setNotFoundList([]);
+    setStatusRec('Recontagens limpas com sucesso.');
+    
     // Update data in Firestore without removing 'base'
     const nextData: RawData = {
       ...data,
       recontagem020502: { ...recState, base: base, over: {}, hist: [] },
     };
     onUpdateData(nextData, 'Recontagens limpas');
-    setNotFoundList([]);
-    setStatusRec('Recontagens limpas com sucesso.');
   };
 
   const handleExport = () => {
@@ -490,6 +491,7 @@ export const Recontagem020502View: React.FC<Recontagem020502ViewProps> = ({
                         <th style={{ padding: '9px 12px', textAlign: 'left', width: '130px' }}>Código</th>
                         <th style={{ padding: '9px 12px', textAlign: 'left' }}>Descrição</th>
                         <th style={{ padding: '9px 12px', textAlign: 'right', width: '130px' }}>Disp. 02.05.02</th>
+                        <th style={{ padding: '9px 12px', textAlign: 'right', width: '130px' }}>Impacto R$</th>
                         {Array.from({ length: maxRecs }).map((_, i) => (
                           <th key={i} style={{ padding: '9px 12px', textAlign: 'right', width: '130px' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
@@ -509,16 +511,25 @@ export const Recontagem020502View: React.FC<Recontagem020502ViewProps> = ({
                     <tbody>
                       {filteredRecontados.length === 0 ? (
                         <tr>
-                          <td colSpan={maxRecs + 4} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
+                          <td colSpan={maxRecs + 5} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
                             Nenhum item encontrado para a busca "{query}".
                           </td>
                         </tr>
                       ) : (
-                        filteredRecontados.map((item) => (
+                        filteredRecontados.map((item) => {
+                             const baseItem = base.find((b) => b.p === item.p);
+                             const custo = baseItem?.custo || 0;
+                             const diffCx = (item.rawDisp || 0) - (item.recontagens[item.recontagens.length - 1]?.cx || 0);
+                             const impacto = diffCx * custo;
+
+                             return (
                           <tr key={item.p} style={{ borderBottom: '1px solid #F3F4F6', background: '#FFFDF5' }}>
                             <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontWeight: 'bold', color: '#1F2937' }}>{item.p}</td>
                             <td style={{ padding: '7px 12px', fontWeight: '500', color: '#374151' }}>{item.d}</td>
                             <td style={{ padding: '7px 12px', textAlign: 'right', color: '#4B5563' }}>{item.disp} cx</td>
+                            <td style={{ padding: '7px 12px', textAlign: 'right', color: impacto !== 0 ? (impacto > 0 ? '#b91c1c' : '#15803d') : '#4B5563', fontWeight: 'bold' }}>
+                                R$ {impacto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </td>
                             {Array.from({ length: maxRecs }).map((_, i) => (
                               <td key={i} style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 'bold', color: '#1E40AF' }}>
                                 {item.recontagens[i] ? (
@@ -533,7 +544,8 @@ export const Recontagem020502View: React.FC<Recontagem020502ViewProps> = ({
                             ))}
                             <td style={{ padding: '7px 12px', fontSize: '11.5px', color: '#6B7280' }}>{item.src}</td>
                           </tr>
-                        ))
+                          );
+                        })
                       )}
                     </tbody>
                   </>

@@ -44,25 +44,40 @@ export async function saveStateToFirestore(data: RawData, actionName?: string, d
     const mainDocRef = doc(db, STATE_COLLECTION, MAIN_DOC);
     const ecDocRef = doc(db, STATE_COLLECTION, EC_DOC);
 
-    // Salva o estado completo, incluindo recontagens, snapshots, desativados, etc.
-    await setDoc(mainDocRef, {
-      payload: JSON.stringify({
-        xs: data.xs,
-        res: data.res,
-        gradeRes: data.gradeRes,
-        aj: data.aj,
-        dia: data.dia,
-        men: data.men,
-        recontagens: data.recontagens,
-        recontagem020502: data.recontagem020502,
-        desativados: data.desativados,
-        dashboardSnapshots: data.dashboardSnapshots,
-        ec0304: data.ec0304,
-        gradeEc: data.gradeEc,
-      }),
-      updatedAt: serverTimestamp(),
-      updatedAtStr: new Date().toISOString(),
+    // Salva o estado completo, dividido em partes para evitar limite de 1MB do Firestore
+    const fullPayload = JSON.stringify({
+      xs: data.xs,
+      res: data.res,
+      gradeRes: data.gradeRes,
+      aj: data.aj,
+      dia: data.dia,
+      men: data.men,
+      recontagens: data.recontagens,
+      recontagem020502: data.recontagem020502,
+      desativados: data.desativados,
+      dashboardSnapshots: data.dashboardSnapshots,
+      ec0304: data.ec0304,
+      gradeEc: data.gradeEc,
     });
+
+    const CHUNK_SIZE = 900000; // ~900KB
+    const numChunks = Math.ceil(fullPayload.length / CHUNK_SIZE);
+    
+    // Deleta chunks antigos se houver, de forma simplificada
+    for (let i = 0; i < 10; i++) {
+        try {
+            await setDoc(doc(db, STATE_COLLECTION, `${MAIN_DOC}_part_${i}`), { exists: false });
+        } catch {}
+    }
+
+    for (let i = 0; i < numChunks; i++) {
+        await setDoc(doc(db, STATE_COLLECTION, `${MAIN_DOC}_part_${i}`), {
+            payload: fullPayload.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE),
+            totalChunks: numChunks,
+            updatedAt: serverTimestamp(),
+            updatedAtStr: new Date().toISOString(),
+        });
+    }
 
     // Salva o estoque central separado para performance
     if (data.ec) {
@@ -119,14 +134,21 @@ export async function loadStateFromFirestore(): Promise<RawData | null> {
       return null;
     }
 
-    const mainDoc = mainSnap.data();
-    let parsedMain: any = null;
-
-    if (mainDoc.payload) {
-      parsedMain = JSON.parse(mainDoc.payload);
-    } else {
-      parsedMain = mainDoc;
+    // Carrega os chunks do payload
+    let fullPayload = '';
+    let i = 0;
+    while (true) {
+        const chunkDocRef = doc(db, STATE_COLLECTION, `${MAIN_DOC}_part_${i}`);
+        const chunkSnap = await getDoc(chunkDocRef);
+        if (!chunkSnap.exists()) break;
+        const chunkData = chunkSnap.data();
+        if (!chunkData.payload) break;
+        fullPayload += chunkData.payload;
+        if (i >= (chunkData.totalChunks || 1) - 1) break;
+        i++;
     }
+
+    const parsedMain = JSON.parse(fullPayload);
 
     let parsedEc: any = undefined;
     if (ecSnap.exists()) {
