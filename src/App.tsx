@@ -27,6 +27,7 @@ import { EstoqueCentralView } from './components/EstoqueCentralView';
 import { DashboardView } from './components/DashboardView';
 import { RecontagemView } from './components/RecontagemView';
 import { Recontagem020502View } from './components/Recontagem020502View';
+import { Contagem021101View } from './components/Contagem021101View';
 import { createRecontagemFromProduct } from './data/defaultRecontagens';
 import { RecontagemItem } from './data/types';
 
@@ -40,7 +41,7 @@ import { PasswordModal } from './components/PasswordModal';
 import { EvolucaoDiariaView } from './components/EvolucaoDiariaView';
 import { ProdutosView } from './components/ProdutosView';
 
-type TabKey = 'dashboard' | 'resumo' | 'ajustes' | 'dif_diaria' | 'dif_mensal' | 'ec' | 'recontagem' | 'recontagem_020502' | 'produtos';
+type TabKey = 'dashboard' | 'resumo' | 'ajustes' | 'dif_diaria' | 'dif_mensal' | 'ec' | 'recontagem' | 'recontagem_020502' | 'contagem_021101' | 'produtos';
 
 const STORAGE_KEY = 'estoque_guarabira_state_v5';
 
@@ -947,6 +948,19 @@ export default function App() {
           REC 02.05.02
         </button>
 
+        <button
+          className={activeTab === 'contagem_021101' ? 'on' : ''}
+          onClick={() => setActiveTab('contagem_021101')}
+          style={
+            activeTab === 'contagem_021101'
+              ? { background: '#7C3AED', color: '#fff' }
+              : { background: '#6D28D9', color: '#EDE9FE' }
+          }
+          title="Contagem 02.11.01 (Comparativo de contagens)"
+        >
+          CONT. 02.11.01
+        </button>
+
 
 
         <button
@@ -991,6 +1005,7 @@ export default function App() {
         {activeTab === 'dif_mensal' && (
           <DifMensalView
             men={data.men}
+            calculatedMap={calculatedMap}
             onClearDay={handleClearMenDay}
             onResetAll={handleResetAllMen}
             onUpdateMen={handleUpdateMen}
@@ -1064,6 +1079,13 @@ export default function App() {
 
         {activeTab === 'recontagem_020502' && (
           <Recontagem020502View
+            data={data}
+            onUpdateData={(newData, desc) => updateDataWithHistory(newData, desc)}
+          />
+        )}
+
+        {activeTab === 'contagem_021101' && (
+          <Contagem021101View
             data={data}
             onUpdateData={(newData, desc) => updateDataWithHistory(newData, desc)}
           />

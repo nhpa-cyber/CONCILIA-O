@@ -18,6 +18,7 @@ import {
 
 export interface DifMensalViewProps {
   men: MenRow[];
+  calculatedMap: Record<number, any>;
   onClearDay?: (day: number) => void;
   onResetAll?: (options?: { resetFechamentoMode?: 'keep' | 'last_day' | 'zero' }) => void;
   onUpdateMen?: (newMen: MenRow[], desc: string) => void;
@@ -26,6 +27,7 @@ export interface DifMensalViewProps {
 
 export const DifMensalView: React.FC<DifMensalViewProps> = ({ 
   men, 
+  calculatedMap,
   onClearDay, 
   onResetAll, 
   onUpdateMen,
@@ -977,7 +979,7 @@ export const DifMensalView: React.FC<DifMensalViewProps> = ({
                                   )}
                                 </div>
                               )}
-                              <div
+                          <div
                                 style={{
                                   border: isLatest ? '2px solid #2B579A' : '1px solid #CBD5E1',
                                   background: isLatest ? '#F0F6FD' : '#FAFAFA',

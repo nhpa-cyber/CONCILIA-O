@@ -1951,12 +1951,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           {/* Dados Financeiros e Relevância no Fechamento */}
           <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '7px', padding: '9px 12px', marginBottom: '8px', fontSize: '11.5px', color: '#475569' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span>Impacto Financeiro:</span>
-              <strong style={{ color: '#0f172a' }}>
-                {hoveredItem.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-              </strong>
-            </div>
+
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>Peso no Fechamento:</span>
               <strong style={{ color: '#0f172a' }}>{Math.round(hoveredItem.peso * 100)}%</strong>

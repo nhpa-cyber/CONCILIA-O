@@ -111,6 +111,22 @@ export interface RawData {
   };
   desativados?: number[];
   dashboardSnapshots?: DashboardSnapshot[];
+  contagem021101?: {
+    counts: {
+      id: string;
+      label: string;
+      rows: (string | number)[][];
+      fileName?: string;
+      totalItems?: number;
+      parsedItems?: {
+        code: string;
+        cleanCode: number;
+        desc: string;
+        qty: number;
+      }[];
+      importedAt: string;
+    }[];
+  };
 }
 
 export interface CalculatedProduct {
