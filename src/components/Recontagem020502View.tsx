@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { RawData } from '../data/types';
+import { RawData, ResRow } from '../data/types';
 
 interface Recontagem020502ViewProps {
   data: RawData;
@@ -345,14 +345,23 @@ export const Recontagem020502View: React.FC<Recontagem020502ViewProps> = ({
         const prodCode = String(row[0]).padStart(8, '0');
         const item = recontadosList.find(x => x.p === prodCode);
         if (item && colIndex < item.recontagens.length) {
-            const newRow = [...row] as any[];
-            newRow[7] = item.recontagens[colIndex].cx * (item.recontagens[colIndex].cx > 0 ? 1 : 1); // Simplificado: cx to units
-            // Nota: Se precisar converter para unidades totais, deveria ser:
-            // newRow[7] = item.recontagens[colIndex].cx * (baseItem?.F || 1);
-            // Vou usar o fator do item se existir na base
             const baseItem = base.find(b => b.p === prodCode);
-            newRow[7] = item.recontagens[colIndex].cx * (baseItem?.F || 1);
-            return newRow;
+            const inventarioBase = item.recontagens[colIndex].cx * (baseItem?.F || 1);
+            
+            return [
+                row[0], // cod
+                row[1], // desc
+                row[2], // tipo
+                row[3], // G
+                row[4], // V0
+                row[5], // U
+                row[6], // X
+                inventarioBase, // b (updated)
+                0, // P (repack)
+                0, // rm
+                0, // rn
+                0  // ro
+            ] as ResRow;
         }
         return row;
     });
