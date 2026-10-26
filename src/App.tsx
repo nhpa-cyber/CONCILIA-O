@@ -38,11 +38,10 @@ import { LogsModal } from './components/LogsModal';
 import { Modal } from './components/Modal';
 import { SalvarDifModal } from './components/SalvarDifModal';
 import { PasswordModal } from './components/PasswordModal';
-import { ContagemGpsView } from './components/ContagemGpsView';
 import { EvolucaoDiariaView } from './components/EvolucaoDiariaView';
 import { ProdutosView } from './components/ProdutosView';
 
-type TabKey = 'dashboard' | 'resumo' | 'ajustes' | 'dif_diaria' | 'dif_mensal' | 'ec' | 'recontagem' | 'recontagem_020502' | 'contagem_021101' | 'contagem_gps' | 'produtos';
+type TabKey = 'dashboard' | 'resumo' | 'ajustes' | 'dif_diaria' | 'dif_mensal' | 'ec' | 'recontagem' | 'recontagem_020502' | 'contagem_021101' | 'produtos';
 
 const STORAGE_KEY = 'estoque_guarabira_state_v5';
 
@@ -856,7 +855,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-zinc-900 flex flex-col font-sans">
+    <div className="min-h-screen bg-white text-zinc-900 flex flex-col font-sans w-full max-w-full overflow-x-hidden">
       {/* Top Black Bar */}
       <div className="top-black-bar print:hidden" />
 
@@ -961,36 +960,6 @@ export default function App() {
         >
           CONT. 02.11.01
         </button>
-
-        <button
-          className={activeTab === 'contagem_gps' ? 'on' : ''}
-          onClick={() => setActiveTab('contagem_gps')}
-          style={
-            activeTab === 'contagem_gps'
-              ? { background: '#059669', color: '#fff' }
-              : { background: '#065F46', color: '#D1FAE5' }
-          }
-          title="Contagem em Campo com Geolocalização GPS do Celular"
-        >
-          📍 CONTAGEM GPS
-          {(data.contagemGps?.length || 0) > 0 && (
-            <span
-              style={{
-                marginLeft: '6px',
-                background: activeTab === 'contagem_gps' ? '#fff' : '#10B981',
-                color: activeTab === 'contagem_gps' ? '#065F46' : '#fff',
-                borderRadius: '999px',
-                padding: '1px 6px',
-                fontSize: '10px',
-                fontWeight: 'bold',
-              }}
-            >
-              {data.contagemGps?.length}
-            </span>
-          )}
-        </button>
-
-
 
         <button
           className={activeTab === 'produtos' ? 'on' : ''}
@@ -1119,16 +1088,6 @@ export default function App() {
             onUpdateData={(newData, desc) => updateDataWithHistory(newData, desc)}
           />
         )}
-
-        {activeTab === 'contagem_gps' && (
-          <ContagemGpsView
-            data={data}
-            calculatedProducts={calculatedProducts}
-            onUpdateData={(newData, desc) => updateDataWithHistory(newData, desc)}
-            onSetToastMessage={(msg) => setToastMessage(msg)}
-          />
-        )}
-
 
 
         {activeTab === 'produtos' && (

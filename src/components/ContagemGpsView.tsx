@@ -502,21 +502,21 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
   return (
     <div className="w-full bg-zinc-50 min-h-screen pb-24 text-zinc-900 font-sans">
       {/* Banner Superior com Identificação e Título */}
-      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-zinc-900 text-white p-4 sm:p-6 shadow-md border-b border-teal-800">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-zinc-900 text-white p-3.5 sm:p-6 shadow-md border-b border-teal-800">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="p-2 bg-emerald-500 text-zinc-950 rounded-lg shadow-inner">
-                <MapPin className="w-6 h-6" />
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 sm:p-2.5 bg-emerald-500 text-zinc-950 rounded-xl shadow-inner shrink-0">
+                <MapPin className="w-5 h-5 sm:w-6 sm:h-6" />
               </span>
               <div>
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+                <h1 className="text-lg sm:text-2xl font-black tracking-tight text-white flex items-center gap-2 flex-wrap">
                   Contagem em Campo com GPS
-                  <span className="text-xs font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] sm:text-xs font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full">
                     Geolocalização Ativa
                   </span>
                 </h1>
-                <p className="text-xs sm:text-sm text-zinc-300">
+                <p className="text-[11px] sm:text-sm text-zinc-300 leading-tight mt-0.5">
                   Rastreamento geográfico exato de onde cada produto do estoque físico foi bipado ou contado no galpão
                 </p>
               </div>
@@ -524,10 +524,10 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
           </div>
 
           {/* Card do Sinal GPS em Tempo Real */}
-          <div className="bg-zinc-950/70 border border-teal-500/30 rounded-xl p-3 sm:px-4 sm:py-3 flex items-center justify-between gap-4 backdrop-blur-sm">
-            <div className="flex items-center gap-3">
+          <div className="w-full md:w-auto bg-zinc-950/80 border border-teal-500/30 rounded-xl p-2.5 sm:px-4 sm:py-3 flex items-center justify-between gap-3 backdrop-blur-sm shadow-inner">
+            <div className="flex items-center gap-2.5 min-w-0">
               <div
-                className={`w-3.5 h-3.5 rounded-full transition-all ${
+                className={`w-3.5 h-3.5 rounded-full shrink-0 transition-all ${
                   gps.loading
                     ? 'bg-amber-400 animate-ping'
                     : gps.lat !== null
@@ -535,23 +535,25 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
                     : 'bg-rose-500'
                 }`}
               />
-              <div>
-                <div className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
-                  {gps.loading
-                    ? 'Buscando satélites GPS...'
-                    : gps.lat !== null
-                    ? 'GPS Conectado'
-                    : 'Aguardando GPS'}
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-zinc-200 flex items-center gap-1.5 flex-wrap">
+                  <span>
+                    {gps.loading
+                      ? 'Buscando GPS...'
+                      : gps.lat !== null
+                      ? 'GPS Conectado'
+                      : 'Aguardando GPS'}
+                  </span>
                   {gps.lat !== null && gps.accuracy !== null && (
-                    <span className="text-[10px] font-normal text-emerald-400 bg-emerald-950/60 border border-emerald-600/40 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] font-normal text-emerald-400 bg-emerald-950/60 border border-emerald-600/40 px-1.5 py-0.2 rounded">
                       ±{gps.accuracy}m
                     </span>
                   )}
                 </div>
-                <div className="text-[11px] text-zinc-400 font-mono">
+                <div className="text-[10px] sm:text-[11px] text-zinc-400 font-mono truncate">
                   {gps.lat !== null && gps.lng !== null
-                    ? `${gps.lat.toFixed(6)}, ${gps.lng.toFixed(6)}`
-                    : 'Clique em "Atualizar GPS"'}
+                    ? `${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}`
+                    : 'Toque para atualizar GPS'}
                 </div>
               </div>
             </div>
@@ -559,11 +561,11 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
             <button
               onClick={requestLocation}
               disabled={gps.loading}
-              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition shadow-sm cursor-pointer disabled:opacity-50"
+              className="shrink-0 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-sm cursor-pointer disabled:opacity-50 min-h-[38px]"
               title="Forçar atualização da posição GPS atual"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${gps.loading ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Atualizar GPS</span>
+              <span>Atualizar GPS</span>
             </button>
           </div>
         </div>
@@ -578,53 +580,53 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
       </div>
 
       {/* Container Principal */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-6">
+      <div className="max-w-7xl mx-auto px-2.5 sm:px-6 py-4 sm:py-6">
         {/* Painel de Métricas Rápidas */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col">
-            <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 mb-4 sm:mb-6">
+          <div className="bg-white p-3 sm:p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col">
+            <span className="text-[10px] sm:text-xs font-semibold text-zinc-500 uppercase tracking-wide">
               Registros Gravados
             </span>
-            <span className="text-2xl sm:text-3xl font-black text-zinc-900 mt-1">
+            <span className="text-xl sm:text-3xl font-black text-zinc-900 mt-1 leading-none">
               {stats.totalItens}
             </span>
-            <span className="text-[11px] text-zinc-400 mt-0.5">
+            <span className="text-[10px] sm:text-[11px] text-zinc-400 mt-1">
               {stats.distinctCodigos} produtos distintos
             </span>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col">
-            <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
+          <div className="bg-white p-3 sm:p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col">
+            <span className="text-[10px] sm:text-xs font-semibold text-zinc-500 uppercase tracking-wide">
               Total em Caixas
             </span>
-            <span className="text-2xl sm:text-3xl font-black text-emerald-700 mt-1">
+            <span className="text-xl sm:text-3xl font-black text-emerald-700 mt-1 leading-none">
               {stats.totalCx.toLocaleString('pt-BR')}
             </span>
-            <span className="text-[11px] text-zinc-400 mt-0.5">
-              Volume em cx físicas apuradas
+            <span className="text-[10px] sm:text-[11px] text-zinc-400 mt-1">
+              Volume em cx apuradas
             </span>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col">
-            <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
+          <div className="bg-white p-3 sm:p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col">
+            <span className="text-[10px] sm:text-xs font-semibold text-zinc-500 uppercase tracking-wide">
               Total em Unidades
             </span>
-            <span className="text-2xl sm:text-3xl font-black text-blue-700 mt-1">
+            <span className="text-xl sm:text-3xl font-black text-blue-700 mt-1 leading-none">
               {stats.totalUnid.toLocaleString('pt-BR')}
             </span>
-            <span className="text-[11px] text-zinc-400 mt-0.5">
+            <span className="text-[10px] sm:text-[11px] text-zinc-400 mt-1">
               Convertidas pelo fator
             </span>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col">
-            <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
+          <div className="bg-white p-3 sm:p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col">
+            <span className="text-[10px] sm:text-xs font-semibold text-zinc-500 uppercase tracking-wide">
               Com Coordenadas GPS
             </span>
-            <span className="text-2xl sm:text-3xl font-black text-teal-700 mt-1">
+            <span className="text-xl sm:text-3xl font-black text-teal-700 mt-1 leading-none">
               {stats.itemsComGps} / {stats.totalItens}
             </span>
-            <span className="text-[11px] text-zinc-400 mt-0.5">
+            <span className="text-[10px] sm:text-[11px] text-zinc-400 mt-1">
               {stats.totalItens > 0
                 ? `${Math.round((stats.itemsComGps / stats.totalItens) * 100)}% auditados com GPS`
                 : '100% de precisão'}
@@ -632,26 +634,26 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
           </div>
         </div>
 
-        {/* Formulário de Registro com Campos Solicitados: Código do Produto, Pallet, Lastro, Caixa, Unidade */}
-        <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 sm:p-6 mb-6">
-          <div className="flex items-center justify-between pb-4 border-b border-zinc-100 mb-4">
+        {/* Formulário de Registro com Campos: Código do Produto, Pallet, Lastro, Caixa, Unidade */}
+        <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3.5 sm:p-6 mb-5 sm:mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 sm:pb-4 border-b border-zinc-100 mb-4 gap-2">
             <div className="flex items-center gap-2">
-              <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+              <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shrink-0">
                 <Plus className="w-5 h-5" />
               </span>
               <div>
-                <h2 className="text-base sm:text-lg font-bold text-zinc-900 leading-tight">
+                <h2 className="text-sm sm:text-lg font-bold text-zinc-900 leading-tight">
                   Registrar Nova Contagem Física com GPS
                 </h2>
-                <p className="text-xs text-zinc-500">
-                  Informe o Código do Produto, Pallet, Lastro, Caixa e Unidade para gravar a localização exata no galpão.
+                <p className="text-[11px] sm:text-xs text-zinc-500">
+                  Informe Código do Produto, Pallet, Lastro, Caixa e Unidade.
                 </p>
               </div>
             </div>
 
-            {/* GPS Indicator no formulário */}
-            <div className="hidden md:flex items-center gap-2 bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1.5 rounded-lg text-xs font-semibold">
-              <Crosshair className="w-4 h-4 text-emerald-600 animate-spin" />
+            {/* GPS Indicator no formulário (visível tanto no desktop quanto no celular) */}
+            <div className="self-start sm:self-auto flex items-center gap-2 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold">
+              <Crosshair className="w-3.5 h-3.5 text-emerald-600 animate-spin" />
               <span>
                 {gps.lat !== null
                   ? `GPS Ativo: ${gps.lat.toFixed(4)}, ${gps.lng?.toFixed(4)} (±${gps.accuracy}m)`
@@ -660,16 +662,17 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {/* Campo 1: Código do Produto (Busca & Seleção) */}
             <div className="relative">
-              <label className="block text-xs font-bold text-zinc-700 uppercase mb-1">
+              <label className="block text-[11px] sm:text-xs font-bold text-zinc-700 uppercase mb-1">
                 Código do Produto (Buscar por Código ou Descrição) *
               </label>
               <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-3 text-zinc-400" />
+                <Search className="w-4 h-4 absolute left-3 top-3.5 text-zinc-400" />
                 <input
                   type="text"
+                  inputMode="search"
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
@@ -678,13 +681,26 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
                     }
                   }}
                   placeholder="Digite o código (ex: 25303) ou o nome do produto..."
-                  className="w-full pl-9 pr-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-lg text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+                  className="w-full pl-9 pr-8 py-2.5 sm:py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-base sm:text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedProduct(null);
+                    }}
+                    className="absolute right-2.5 top-3 text-zinc-400 hover:text-zinc-600 p-1"
+                    title="Limpar busca"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
               </div>
 
               {/* Autocomplete Dropdown */}
               {filteredProductOptions.length > 0 && !selectedProduct && (
-                <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-zinc-100">
                   {filteredProductOptions.map((prod) => (
                     <button
                       key={prod.c}
@@ -693,15 +709,15 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
                         setSelectedProduct(prod);
                         setSearchQuery(`${prod.c} - ${prod.d}`);
                       }}
-                      className="w-full text-left px-3 py-2.5 hover:bg-emerald-50 border-b border-zinc-100 flex items-center justify-between text-xs cursor-pointer transition"
+                      className="w-full text-left px-3 py-3 hover:bg-emerald-50 active:bg-emerald-100 flex items-center justify-between text-xs cursor-pointer transition min-h-[44px]"
                     >
-                      <div>
+                      <div className="min-w-0 pr-2">
                         <span className="font-bold text-emerald-700 font-mono mr-2">
                           #{prod.c}
                         </span>
-                        <span className="font-medium text-zinc-800">{prod.d}</span>
+                        <span className="font-medium text-zinc-800 break-words">{prod.d}</span>
                       </div>
-                      <span className="text-[11px] text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded font-mono">
+                      <span className="shrink-0 text-[10px] text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded font-mono">
                         Fator: {prod.H} {prod.t}
                       </span>
                     </button>
@@ -717,26 +733,39 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
                       <span className="font-bold text-emerald-900 font-mono bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">
                         #{selectedProduct.c}
                       </span>
-                      <span className="font-bold text-emerald-950">{selectedProduct.d}</span>
+                      <span className="font-bold text-emerald-950 break-words">{selectedProduct.d}</span>
                     </div>
-                    <div className="flex items-center gap-2 mt-1 text-[11px] text-emerald-800">
+                    <div className="flex items-center gap-2 mt-1 text-[11px] text-emerald-800 flex-wrap">
                       <span>Embalagem: <b>1 Cx = {fatorEmbalagem} unid</b></span>
                       <span>•</span>
                       <span>
-                        Padrão do Palete: <b>{cxPorLastro} cx/lastro</b> × <b>{lastrosPorPallet} lastros</b> ={' '}
+                        Palete: <b>{cxPorLastro} cx/lastro</b> × <b>{lastrosPorPallet} lastros</b> ={' '}
                         <b className="text-emerald-900 font-bold">{cxPorPalletTotal} cx/palete</b>
                       </span>
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setShowPalletConfig(!showPalletConfig)}
-                    className="self-start sm:self-auto px-2.5 py-1 text-[11px] font-semibold text-emerald-800 bg-white border border-emerald-300 hover:bg-emerald-100 rounded-lg transition flex items-center gap-1 cursor-pointer"
-                  >
-                    <Settings2 className="w-3.5 h-3.5" />
-                    <span>{showPalletConfig ? 'Ocultar Padrão' : 'Ajustar Lastro/Palete'}</span>
-                  </button>
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setShowPalletConfig(!showPalletConfig)}
+                      className="px-2.5 py-1 text-[11px] font-semibold text-emerald-800 bg-white border border-emerald-300 hover:bg-emerald-100 rounded-lg transition flex items-center gap-1 cursor-pointer min-h-[32px]"
+                    >
+                      <Settings2 className="w-3.5 h-3.5" />
+                      <span>{showPalletConfig ? 'Ocultar Padrão' : 'Ajustar Lastro'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedProduct(null);
+                        setSearchQuery('');
+                      }}
+                      className="px-2 py-1 text-[11px] font-semibold text-zinc-600 bg-white border border-zinc-200 hover:bg-zinc-100 rounded-lg transition cursor-pointer min-h-[32px]"
+                      title="Trocar de produto"
+                    >
+                      Trocar
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -754,10 +783,11 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
                       </label>
                       <input
                         type="number"
+                        inputMode="numeric"
                         min="1"
                         value={cxPorLastro}
                         onChange={(e) => handleSavePalletConfig(Math.max(1, parseInt(e.target.value) || 1), lastrosPorPallet)}
-                        className="w-full px-2.5 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900"
+                        className="w-full px-2.5 py-2 bg-white border border-zinc-300 rounded-lg text-base sm:text-xs font-bold text-zinc-900"
                       />
                     </div>
                     <div>
@@ -766,10 +796,11 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
                       </label>
                       <input
                         type="number"
+                        inputMode="numeric"
                         min="1"
                         value={lastrosPorPallet}
                         onChange={(e) => handleSavePalletConfig(cxPorLastro, Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-full px-2.5 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900"
+                        className="w-full px-2.5 py-2 bg-white border border-zinc-300 rounded-lg text-base sm:text-xs font-bold text-zinc-900"
                       />
                     </div>
                   </div>
@@ -780,170 +811,226 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
               )}
             </div>
 
-            {/* Grid dos 4 campos solicitados: Pallet, Lastro, Caixa e Unidade */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            {/* Grid dos 4 campos: Pallet, Lastro, Caixa e Unidade (Otimizado para toque no celular) */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
               {/* Campo 2: Pallet */}
-              <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-zinc-800 uppercase flex items-center gap-1">
-                    <Boxes className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Pallet</span>
-                  </label>
-                  <span className="text-[10px] text-zinc-500 font-medium">
-                    {cxPorPalletTotal} cx/plt
-                  </span>
+              <div className="bg-zinc-50 p-2.5 sm:p-3 rounded-xl border border-zinc-200 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] sm:text-xs font-bold text-zinc-800 uppercase flex items-center gap-1">
+                      <Boxes className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Pallet</span>
+                    </label>
+                    <span className="text-[9px] sm:text-[10px] text-zinc-500 font-medium">
+                      {cxPorPalletTotal} cx/plt
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    min="0"
+                    value={pallet}
+                    onChange={(e) => setPallet(e.target.value)}
+                    placeholder="0"
+                    className="w-full px-2.5 sm:px-3 py-2 bg-white border border-zinc-300 rounded-lg text-lg sm:text-base font-black text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition h-11 sm:h-10 text-center"
+                  />
                 </div>
-                <input
-                  type="number"
-                  step="any"
-                  min="0"
-                  value={pallet}
-                  onChange={(e) => setPallet(e.target.value)}
-                  placeholder="0"
-                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm font-black text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
-                />
-                {/* Atalhos Rápidos */}
-                <div className="flex gap-1 mt-1.5 flex-wrap">
-                  {[1, 2, 5, 10].map((val) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => {
-                        const cur = parseFloat(pallet) || 0;
-                        setPallet(String(cur + val));
-                      }}
-                      className="px-1.5 py-0.5 text-[10px] font-bold bg-white hover:bg-emerald-100 text-zinc-700 hover:text-emerald-800 rounded border border-zinc-200 transition cursor-pointer"
-                    >
-                      +{val}
-                    </button>
-                  ))}
+                {/* Atalhos Rápidos com botões de toque */}
+                <div className="mt-1.5">
+                  <div className="grid grid-cols-4 gap-1">
+                    {[1, 2, 5, 10].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => {
+                          const cur = parseFloat(pallet) || 0;
+                          setPallet(String(cur + val));
+                        }}
+                        className="py-1 text-[11px] font-bold bg-white active:bg-emerald-200 text-zinc-700 active:text-emerald-900 rounded border border-zinc-200 transition cursor-pointer min-h-[30px]"
+                      >
+                        +{val}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between mt-1 text-[10px] text-zinc-400">
+                    <span>Paletes cheios</span>
+                    {pallet && (
+                      <button
+                        type="button"
+                        onClick={() => setPallet('')}
+                        className="text-rose-500 hover:text-rose-700 font-bold cursor-pointer"
+                      >
+                        Zerar
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <span className="text-[10px] text-zinc-400 block mt-1">
-                  Paletes cheios
-                </span>
               </div>
 
               {/* Campo 3: Lastro */}
-              <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-zinc-800 uppercase flex items-center gap-1">
-                    <Layers className="w-3.5 h-3.5 text-teal-600" />
-                    <span>Lastro</span>
-                  </label>
-                  <span className="text-[10px] text-zinc-500 font-medium">
-                    {cxPorLastro} cx/lst
-                  </span>
+              <div className="bg-zinc-50 p-2.5 sm:p-3 rounded-xl border border-zinc-200 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] sm:text-xs font-bold text-zinc-800 uppercase flex items-center gap-1">
+                      <Layers className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                      <span>Lastro</span>
+                    </label>
+                    <span className="text-[9px] sm:text-[10px] text-zinc-500 font-medium">
+                      {cxPorLastro} cx/lst
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    min="0"
+                    value={lastro}
+                    onChange={(e) => setLastro(e.target.value)}
+                    placeholder="0"
+                    className="w-full px-2.5 sm:px-3 py-2 bg-white border border-zinc-300 rounded-lg text-lg sm:text-base font-black text-teal-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition h-11 sm:h-10 text-center"
+                  />
                 </div>
-                <input
-                  type="number"
-                  step="any"
-                  min="0"
-                  value={lastro}
-                  onChange={(e) => setLastro(e.target.value)}
-                  placeholder="0"
-                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm font-black text-teal-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
-                />
                 {/* Atalhos Rápidos */}
-                <div className="flex gap-1 mt-1.5 flex-wrap">
-                  {[1, 2, 3, 4].map((val) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => {
-                        const cur = parseFloat(lastro) || 0;
-                        setLastro(String(cur + val));
-                      }}
-                      className="px-1.5 py-0.5 text-[10px] font-bold bg-white hover:bg-teal-100 text-zinc-700 hover:text-teal-800 rounded border border-zinc-200 transition cursor-pointer"
-                    >
-                      +{val}
-                    </button>
-                  ))}
+                <div className="mt-1.5">
+                  <div className="grid grid-cols-4 gap-1">
+                    {[1, 2, 3, 4].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => {
+                          const cur = parseFloat(lastro) || 0;
+                          setLastro(String(cur + val));
+                        }}
+                        className="py-1 text-[11px] font-bold bg-white active:bg-teal-200 text-zinc-700 active:text-teal-900 rounded border border-zinc-200 transition cursor-pointer min-h-[30px]"
+                      >
+                        +{val}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between mt-1 text-[10px] text-zinc-400">
+                    <span>Camadas soltas</span>
+                    {lastro && (
+                      <button
+                        type="button"
+                        onClick={() => setLastro('')}
+                        className="text-rose-500 hover:text-rose-700 font-bold cursor-pointer"
+                      >
+                        Zerar
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <span className="text-[10px] text-zinc-400 block mt-1">
-                  Camadas soltas
-                </span>
               </div>
 
               {/* Campo 4: Caixa */}
-              <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-zinc-800 uppercase flex items-center gap-1">
-                    <Package className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Caixa</span>
-                  </label>
-                  <span className="text-[10px] text-zinc-500 font-medium">
-                    {fatorEmbalagem} unid/cx
-                  </span>
+              <div className="bg-zinc-50 p-2.5 sm:p-3 rounded-xl border border-zinc-200 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] sm:text-xs font-bold text-zinc-800 uppercase flex items-center gap-1">
+                      <Package className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span>Caixa</span>
+                    </label>
+                    <span className="text-[9px] sm:text-[10px] text-zinc-500 font-medium">
+                      {fatorEmbalagem} un/cx
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    min="0"
+                    value={caixa}
+                    onChange={(e) => setCaixa(e.target.value)}
+                    placeholder="0"
+                    className="w-full px-2.5 sm:px-3 py-2 bg-white border border-zinc-300 rounded-lg text-lg sm:text-base font-black text-blue-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition h-11 sm:h-10 text-center"
+                  />
                 </div>
-                <input
-                  type="number"
-                  step="any"
-                  min="0"
-                  value={caixa}
-                  onChange={(e) => setCaixa(e.target.value)}
-                  placeholder="0"
-                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm font-black text-blue-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
-                />
                 {/* Atalhos Rápidos */}
-                <div className="flex gap-1 mt-1.5 flex-wrap">
-                  {[1, 5, 10, 20].map((val) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => {
-                        const cur = parseFloat(caixa) || 0;
-                        setCaixa(String(cur + val));
-                      }}
-                      className="px-1.5 py-0.5 text-[10px] font-bold bg-white hover:bg-blue-100 text-zinc-700 hover:text-blue-800 rounded border border-zinc-200 transition cursor-pointer"
-                    >
-                      +{val}
-                    </button>
-                  ))}
+                <div className="mt-1.5">
+                  <div className="grid grid-cols-4 gap-1">
+                    {[1, 5, 10, 20].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => {
+                          const cur = parseFloat(caixa) || 0;
+                          setCaixa(String(cur + val));
+                        }}
+                        className="py-1 text-[11px] font-bold bg-white active:bg-blue-200 text-zinc-700 active:text-blue-900 rounded border border-zinc-200 transition cursor-pointer min-h-[30px]"
+                      >
+                        +{val}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between mt-1 text-[10px] text-zinc-400">
+                    <span>Caixas avulsas</span>
+                    {caixa && (
+                      <button
+                        type="button"
+                        onClick={() => setCaixa('')}
+                        className="text-rose-500 hover:text-rose-700 font-bold cursor-pointer"
+                      >
+                        Zerar
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <span className="text-[10px] text-zinc-400 block mt-1">
-                  Caixas avulsas
-                </span>
               </div>
 
               {/* Campo 5: Unidade */}
-              <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-zinc-800 uppercase flex items-center gap-1">
-                    <Box className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Unidade</span>
-                  </label>
-                  <span className="text-[10px] text-zinc-500 font-medium">
-                    Avulsas
-                  </span>
+              <div className="bg-zinc-50 p-2.5 sm:p-3 rounded-xl border border-zinc-200 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] sm:text-xs font-bold text-zinc-800 uppercase flex items-center gap-1">
+                      <Box className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span>Unidade</span>
+                    </label>
+                    <span className="text-[9px] sm:text-[10px] text-zinc-500 font-medium">
+                      Avulsas
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    step="1"
+                    min="0"
+                    value={unidade}
+                    onChange={(e) => setUnidade(e.target.value)}
+                    placeholder="0"
+                    className="w-full px-2.5 sm:px-3 py-2 bg-white border border-zinc-300 rounded-lg text-lg sm:text-base font-black text-amber-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition h-11 sm:h-10 text-center"
+                  />
                 </div>
-                <input
-                  type="number"
-                  step="1"
-                  min="0"
-                  value={unidade}
-                  onChange={(e) => setUnidade(e.target.value)}
-                  placeholder="0"
-                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm font-black text-amber-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
-                />
                 {/* Atalhos Rápidos */}
-                <div className="flex gap-1 mt-1.5 flex-wrap">
-                  {[1, 2, 6, 12].map((val) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => {
-                        const cur = parseFloat(unidade) || 0;
-                        setUnidade(String(cur + val));
-                      }}
-                      className="px-1.5 py-0.5 text-[10px] font-bold bg-white hover:bg-amber-100 text-zinc-700 hover:text-amber-800 rounded border border-zinc-200 transition cursor-pointer"
-                    >
-                      +{val}
-                    </button>
-                  ))}
+                <div className="mt-1.5">
+                  <div className="grid grid-cols-4 gap-1">
+                    {[1, 2, 6, 12].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => {
+                          const cur = parseFloat(unidade) || 0;
+                          setUnidade(String(cur + val));
+                        }}
+                        className="py-1 text-[11px] font-bold bg-white active:bg-amber-200 text-zinc-700 active:text-amber-900 rounded border border-zinc-200 transition cursor-pointer min-h-[30px]"
+                      >
+                        +{val}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between mt-1 text-[10px] text-zinc-400">
+                    <span>Garrafas/latas</span>
+                    {unidade && (
+                      <button
+                        type="button"
+                        onClick={() => setUnidade('')}
+                        className="text-rose-500 hover:text-rose-700 font-bold cursor-pointer"
+                      >
+                        Zerar
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <span className="text-[10px] text-zinc-400 block mt-1">
-                  Garrafas/latas soltas
-                </span>
               </div>
             </div>
 
@@ -978,17 +1065,17 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 bg-white px-3 py-2 rounded-lg border border-emerald-300 shadow-xs">
+                <div className="flex items-center gap-3 sm:gap-4 bg-white px-3 py-2 rounded-xl border border-emerald-300 shadow-xs">
                   <div>
                     <span className="text-[10px] font-semibold text-zinc-500 uppercase block">Total Caixas</span>
-                    <span className="text-lg font-black text-emerald-700 leading-tight">
+                    <span className="text-base sm:text-lg font-black text-emerald-700 leading-tight">
                       {totalCxCalculado.toLocaleString('pt-BR')} cx
                     </span>
                   </div>
                   <div className="w-px h-8 bg-zinc-200" />
                   <div>
                     <span className="text-[10px] font-semibold text-zinc-500 uppercase block">Total Unidades</span>
-                    <span className="text-lg font-black text-blue-700 leading-tight">
+                    <span className="text-base sm:text-lg font-black text-blue-700 leading-tight">
                       {totalUnidCalculado.toLocaleString('pt-BR')} unid
                     </span>
                   </div>
@@ -998,28 +1085,28 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
           </div>
 
           {/* Botão de Registro com GPS */}
-          <div className="mt-5 pt-4 border-t border-zinc-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <div className="text-xs text-zinc-500 flex items-center gap-1.5">
+          <div className="mt-4 sm:mt-5 pt-3 sm:pt-4 border-t border-zinc-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="text-[11px] sm:text-xs text-zinc-500 flex items-center gap-1.5">
               <Info className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>
-                Ao clicar em registrar, as coordenadas precisas do celular e o horário serão gravados junto à contagem física.
+                As coordenadas GPS e data/hora serão gravadas junto ao item.
               </span>
             </div>
 
             <button
               onClick={handleRegistrarContagem}
-              className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-bold rounded-xl text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 active:from-emerald-700 active:to-teal-800 text-white font-black rounded-xl text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
             >
-              <MapPin className="w-5 h-5 text-amber-300" />
+              <MapPin className="w-5 h-5 text-amber-300 shrink-0" />
               <span>REGISTRAR COM COORDENADAS GPS 📍</span>
             </button>
           </div>
         </div>
 
         {/* Bloco 2: Ações de Exportação, Mapa Geral e Auditoria */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-bold text-zinc-900 flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-bold text-zinc-900 flex items-center gap-2">
               Histórico de Produtos Contados
               <span className="text-xs font-semibold bg-zinc-200 text-zinc-800 px-2.5 py-0.5 rounded-full">
                 {filteredItems.length} registros
@@ -1027,48 +1114,50 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
             </h3>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Botões de Ação Responsivos (Grid 2 colunas no celular, inline no desktop) */}
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
             {/* Botão Ver Mapa Geral */}
             <button
               onClick={() => setIsMapModalOpen(true)}
               disabled={items.length === 0}
-              className="px-3.5 py-2 bg-teal-800 hover:bg-teal-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer disabled:opacity-40"
+              className="px-3 py-2.5 bg-teal-800 hover:bg-teal-700 active:bg-teal-900 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer disabled:opacity-40 min-h-[42px]"
               title="Visualizar mapa com pinos dos produtos contados"
             >
-              <Compass className="w-4 h-4 text-teal-300" />
-              <span>Ver Mapa da Contagem</span>
+              <Compass className="w-4 h-4 text-teal-300 shrink-0" />
+              <span>Ver Mapa ({stats.itemsComGps})</span>
             </button>
 
             {/* Botão Exportar Excel */}
             <button
               onClick={handleExportXLSX}
               disabled={items.length === 0}
-              className="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer disabled:opacity-40"
+              className="px-3 py-2.5 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-900 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer disabled:opacity-40 min-h-[42px]"
               title="Baixar planilha Excel com Pallet, Lastro, Caixa, Unidade e coordenadas GPS"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-              <span>Exportar Excel (XLSX)</span>
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Exportar Excel</span>
             </button>
 
             {/* Botão Aplicar ao Estoque Físico */}
             <button
               onClick={() => setShowApplyConfirmModal(true)}
               disabled={items.length === 0}
-              className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer disabled:opacity-40"
+              className="px-3 py-2.5 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer disabled:opacity-40 min-h-[42px]"
               title="Atualiza a coluna de inventário físico com os dados desta contagem"
             >
-              <CheckCircle2 className="w-4 h-4 text-amber-200" />
-              <span>Aplicar ao Estoque Físico</span>
+              <CheckCircle2 className="w-4 h-4 text-amber-200 shrink-0" />
+              <span>Aplicar Estoque</span>
             </button>
 
             {/* Limpar Tudo */}
             {items.length > 0 && (
               <button
                 onClick={handleClearAll}
-                className="p-2 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                className="px-3 py-2.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer min-h-[42px]"
                 title="Limpar todos os registros de contagem"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>Limpar Todos</span>
               </button>
             )}
           </div>
@@ -1077,221 +1166,337 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
         {/* Campo de Filtro rápido na lista */}
         <div className="mb-4">
           <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-zinc-400" />
+            <Search className="w-4 h-4 absolute left-3 top-3 text-zinc-400" />
             <input
               type="text"
               value={filterQuery}
               onChange={(e) => setFilterQuery(e.target.value)}
               placeholder="Filtrar por código ou descrição do produto..."
-              className="w-full pl-9 pr-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
+              className="w-full pl-9 pr-3 py-2.5 bg-white border border-zinc-200 rounded-xl text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
             />
           </div>
         </div>
 
-        {/* Tabela de Produtos Contados com Pallet, Lastro, Caixa, Unidade e GPS */}
+        {/* Exibição dos Produtos Contados: Desktop (Tabela) e Mobile (Cards Responsivos) */}
         <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
           {filteredItems.length === 0 ? (
-            <div className="p-12 text-center text-zinc-400">
-              <MapPin className="w-12 h-12 mx-auto mb-3 text-zinc-300 stroke-1" />
+            <div className="p-8 sm:p-12 text-center text-zinc-400">
+              <MapPin className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 text-zinc-300 stroke-1" />
               <p className="text-sm font-semibold text-zinc-600">
                 Nenhum produto registrado na contagem com GPS ainda.
               </p>
-              <p className="text-xs text-zinc-400 mt-1">
+              <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
                 Utilize o formulário acima para pesquisar um item e gravar sua primeira contagem com geolocalização.
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-zinc-100 text-zinc-700 font-bold border-b border-zinc-200 uppercase tracking-wider">
-                    <th className="p-3 text-center w-12">#</th>
-                    <th className="p-3">Código & Descrição</th>
-                    <th className="p-3 text-center">Pallet</th>
-                    <th className="p-3 text-center">Lastro</th>
-                    <th className="p-3 text-center">Caixa</th>
-                    <th className="p-3 text-center">Unidade</th>
-                    <th className="p-3 text-right">Total Cx</th>
-                    <th className="p-3 text-right">Total Unid</th>
-                    <th className="p-3">Data / Hora</th>
-                    <th className="p-3">Geolocalização (GPS)</th>
-                    <th className="p-3 text-center">Google Maps</th>
-                    <th className="p-3 text-center w-12">Ação</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200">
-                  {filteredItems.map((item, index) => {
-                    const hasCoords = item.lat !== 0 && item.lng !== 0;
+            <>
+              {/* VERSÃO MOBILE: Cards Otimizados para Celular (visível apenas em telas menores que MD) */}
+              <div className="block md:hidden divide-y divide-zinc-200">
+                {filteredItems.map((item, index) => {
+                  const hasCoords = item.lat !== 0 && item.lng !== 0;
 
-                    return (
-                      <tr key={item.id} className="hover:bg-zinc-50 transition">
-                        <td className="p-3 text-center text-zinc-400 font-mono">
-                          {index + 1}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                              #{item.cod}
-                            </span>
-                            <span className="font-bold text-zinc-900">{item.desc}</span>
-                          </div>
-                        </td>
-                        <td className="p-3 text-center font-mono font-bold text-emerald-800">
-                          {item.pallet !== undefined && item.pallet > 0 ? (
-                            <span className="bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                              {item.pallet} plt
-                            </span>
-                          ) : (
-                            <span className="text-zinc-300">-</span>
-                          )}
-                        </td>
-                        <td className="p-3 text-center font-mono font-bold text-teal-800">
-                          {item.lastro !== undefined && item.lastro > 0 ? (
-                            <span className="bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                              {item.lastro} lst
-                            </span>
-                          ) : (
-                            <span className="text-zinc-300">-</span>
-                          )}
-                        </td>
-                        <td className="p-3 text-center font-mono font-bold text-blue-800">
-                          {item.caixa !== undefined && item.caixa > 0 ? (
-                            <span className="bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                              {item.caixa} cx
-                            </span>
-                          ) : (
-                            <span className="text-zinc-300">-</span>
-                          )}
-                        </td>
-                        <td className="p-3 text-center font-mono font-bold text-amber-800">
-                          {item.unidade !== undefined && item.unidade > 0 ? (
-                            <span className="bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                              {item.unidade} un
-                            </span>
-                          ) : (
-                            <span className="text-zinc-300">-</span>
-                          )}
-                        </td>
-                        <td className="p-3 text-right font-black text-sm text-emerald-700">
-                          {item.qtdCx.toLocaleString('pt-BR')} cx
-                        </td>
-                        <td className="p-3 text-right font-bold text-zinc-700">
-                          {item.qtdUnid.toLocaleString('pt-BR')} unid
-                        </td>
-                        <td className="p-3 text-zinc-600 whitespace-nowrap font-mono text-[11px]">
-                          {item.dataHora}
-                        </td>
-                        <td className="p-3">
-                          {hasCoords ? (
-                            <div className="flex flex-col gap-1">
-                              <div className="font-mono text-[11px] text-zinc-800 font-semibold flex items-center gap-1">
-                                <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                {item.lat.toFixed(6)}, {item.lng.toFixed(6)}
-                              </div>
-                              <div>{getAccuracyBadge(item.accuracy)}</div>
-                            </div>
-                          ) : (
-                            <span className="text-zinc-400 italic">Sem GPS</span>
-                          )}
-                        </td>
-                        <td className="p-3 text-center">
-                          {hasCoords ? (
-                            <a
-                              href={item.mapsUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold transition"
-                              title="Abrir no Google Maps"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                              <span>Ver no Maps</span>
-                            </a>
-                          ) : (
-                            <span className="text-zinc-400 text-xs">-</span>
-                          )}
-                        </td>
-                        <td className="p-3 text-center">
+                  return (
+                    <div key={item.id} className="p-3.5 space-y-2.5 hover:bg-zinc-50 transition">
+                      {/* Topo do Card: Código, Ordem e Botão Excluir */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-mono text-zinc-400 font-semibold">
+                            #{index + 1}
+                          </span>
+                          <span className="font-mono font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-300 text-xs">
+                            COD {item.cod}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-zinc-400 font-mono">
+                            {item.dataHora}
+                          </span>
                           <button
                             onClick={() => handleDeleteItem(item.id)}
-                            className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                            className="p-1.5 text-zinc-400 hover:text-rose-600 active:bg-rose-100 rounded-lg transition cursor-pointer"
                             title="Excluir este registro"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-4 h-4 text-rose-500" />
                           </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        </div>
+                      </div>
+
+                      {/* Nome do Produto */}
+                      <h4 className="text-sm font-bold text-zinc-900 leading-tight">
+                        {item.desc}
+                      </h4>
+
+                      {/* Grid de 4 Valores: Pallet, Lastro, Caixa e Unidade */}
+                      <div className="grid grid-cols-4 gap-1.5 text-center">
+                        <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-lg p-1.5">
+                          <span className="text-[9px] font-bold text-emerald-700 uppercase block">Pallet</span>
+                          <span className="text-xs font-black text-emerald-950 font-mono">
+                            {item.pallet && item.pallet > 0 ? `${item.pallet} plt` : '-'}
+                          </span>
+                        </div>
+
+                        <div className="bg-teal-50/70 border border-teal-200/80 rounded-lg p-1.5">
+                          <span className="text-[9px] font-bold text-teal-700 uppercase block">Lastro</span>
+                          <span className="text-xs font-black text-teal-950 font-mono">
+                            {item.lastro && item.lastro > 0 ? `${item.lastro} lst` : '-'}
+                          </span>
+                        </div>
+
+                        <div className="bg-blue-50/70 border border-blue-200/80 rounded-lg p-1.5">
+                          <span className="text-[9px] font-bold text-blue-700 uppercase block">Caixa</span>
+                          <span className="text-xs font-black text-blue-950 font-mono">
+                            {item.caixa && item.caixa > 0 ? `${item.caixa} cx` : '-'}
+                          </span>
+                        </div>
+
+                        <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg p-1.5">
+                          <span className="text-[9px] font-bold text-amber-700 uppercase block">Unidade</span>
+                          <span className="text-xs font-black text-amber-950 font-mono">
+                            {item.unidade && item.unidade > 0 ? `${item.unidade} un` : '-'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Destaque do Total Apurado */}
+                      <div className="flex items-center justify-between bg-zinc-100/80 px-3 py-2 rounded-xl text-xs">
+                        <span className="font-bold text-zinc-600 uppercase text-[10px]">Total Calculado</span>
+                        <div className="flex items-center gap-3">
+                          <span className="font-black text-emerald-700 font-mono text-sm">
+                            {item.qtdCx.toLocaleString('pt-BR')} cx
+                          </span>
+                          <span className="text-zinc-300">•</span>
+                          <span className="font-bold text-blue-700 font-mono text-xs">
+                            {item.qtdUnid.toLocaleString('pt-BR')} unid
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Geolocalização GPS e Botão Google Maps */}
+                      <div className="flex items-center justify-between pt-1 gap-2">
+                        {hasCoords ? (
+                          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                            <span className="font-mono text-[11px] text-zinc-700 font-semibold flex items-center gap-1">
+                              <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              {item.lat.toFixed(5)}, {item.lng.toFixed(5)}
+                            </span>
+                            {getAccuracyBadge(item.accuracy)}
+                          </div>
+                        ) : (
+                          <span className="text-zinc-400 text-xs italic">Sem GPS</span>
+                        )}
+
+                        {hasCoords && (
+                          <a
+                            href={item.mapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-xs min-h-[34px]"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Abrir no Maps</span>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* VERSÃO DESKTOP: Tabela Completa (visível a partir de md) */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-zinc-100 text-zinc-700 font-bold border-b border-zinc-200 uppercase tracking-wider">
+                      <th className="p-3 text-center w-12">#</th>
+                      <th className="p-3">Código & Descrição</th>
+                      <th className="p-3 text-center">Pallet</th>
+                      <th className="p-3 text-center">Lastro</th>
+                      <th className="p-3 text-center">Caixa</th>
+                      <th className="p-3 text-center">Unidade</th>
+                      <th className="p-3 text-right">Total Cx</th>
+                      <th className="p-3 text-right">Total Unid</th>
+                      <th className="p-3">Data / Hora</th>
+                      <th className="p-3">Geolocalização (GPS)</th>
+                      <th className="p-3 text-center">Google Maps</th>
+                      <th className="p-3 text-center w-12">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-200">
+                    {filteredItems.map((item, index) => {
+                      const hasCoords = item.lat !== 0 && item.lng !== 0;
+
+                      return (
+                        <tr key={item.id} className="hover:bg-zinc-50 transition">
+                          <td className="p-3 text-center text-zinc-400 font-mono">
+                            {index + 1}
+                          </td>
+                          <td className="p-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                #{item.cod}
+                              </span>
+                              <span className="font-bold text-zinc-900">{item.desc}</span>
+                            </div>
+                          </td>
+                          <td className="p-3 text-center font-mono font-bold text-emerald-800">
+                            {item.pallet !== undefined && item.pallet > 0 ? (
+                              <span className="bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                {item.pallet} plt
+                              </span>
+                            ) : (
+                              <span className="text-zinc-300">-</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-center font-mono font-bold text-teal-800">
+                            {item.lastro !== undefined && item.lastro > 0 ? (
+                              <span className="bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                                {item.lastro} lst
+                              </span>
+                            ) : (
+                              <span className="text-zinc-300">-</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-center font-mono font-bold text-blue-800">
+                            {item.caixa !== undefined && item.caixa > 0 ? (
+                              <span className="bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                {item.caixa} cx
+                              </span>
+                            ) : (
+                              <span className="text-zinc-300">-</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-center font-mono font-bold text-amber-800">
+                            {item.unidade !== undefined && item.unidade > 0 ? (
+                              <span className="bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                {item.unidade} un
+                              </span>
+                            ) : (
+                              <span className="text-zinc-300">-</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-right font-black text-sm text-emerald-700">
+                            {item.qtdCx.toLocaleString('pt-BR')} cx
+                          </td>
+                          <td className="p-3 text-right font-bold text-zinc-700">
+                            {item.qtdUnid.toLocaleString('pt-BR')} unid
+                          </td>
+                          <td className="p-3 text-zinc-600 whitespace-nowrap font-mono text-[11px]">
+                            {item.dataHora}
+                          </td>
+                          <td className="p-3">
+                            {hasCoords ? (
+                              <div className="flex flex-col gap-1">
+                                <div className="font-mono text-[11px] text-zinc-800 font-semibold flex items-center gap-1">
+                                  <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  {item.lat.toFixed(6)}, {item.lng.toFixed(6)}
+                                </div>
+                                <div>{getAccuracyBadge(item.accuracy)}</div>
+                              </div>
+                            ) : (
+                              <span className="text-zinc-400 italic">Sem GPS</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            {hasCoords ? (
+                              <a
+                                href={item.mapsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold transition"
+                                title="Abrir no Google Maps"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                <span>Ver no Maps</span>
+                              </a>
+                            ) : (
+                              <span className="text-zinc-400 text-xs">-</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            <button
+                              onClick={() => handleDeleteItem(item.id)}
+                              className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                              title="Excluir este registro"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>
 
       {/* MODAL: Visualizador de Mapa Geral dos Produtos */}
       {isMapModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-zinc-200">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-6 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden border border-zinc-200">
             {/* Cabeçalho do Modal */}
-            <div className="p-4 bg-zinc-900 text-white flex items-center justify-between">
+            <div className="p-3.5 sm:p-4 bg-zinc-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Compass className="w-5 h-5 text-emerald-400" />
-                <h3 className="font-bold text-base">Mapa Geográfico da Contagem</h3>
-                <span className="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/40">
-                  {stats.itemsComGps} pontos mapeados
+                <Compass className="w-5 h-5 text-emerald-400 shrink-0" />
+                <h3 className="font-bold text-sm sm:text-base">Mapa Geográfico da Contagem</h3>
+                <span className="text-[10px] sm:text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/40">
+                  {stats.itemsComGps} pontos
                 </span>
               </div>
               <button
                 onClick={() => setIsMapModalOpen(false)}
-                className="text-zinc-400 hover:text-white p-1 rounded-lg transition"
+                className="text-zinc-400 hover:text-white p-1.5 rounded-lg transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Conteúdo do Modal */}
-            <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-4">
-              <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-xs text-emerald-900 flex items-start gap-2">
+            <div className="p-3 sm:p-4 overflow-y-auto flex-1 flex flex-col gap-3 sm:gap-4">
+              <div className="bg-emerald-50 border border-emerald-200 p-2.5 sm:p-3 rounded-xl text-xs text-emerald-900 flex items-start gap-2">
                 <Info className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold">
+                  <p className="font-semibold text-xs sm:text-sm">
                     Auditoria de Campo e Rastreabilidade Geográfica
                   </p>
-                  <p className="mt-0.5 text-emerald-800">
-                    Clique em qualquer ponto abaixo para abrir o local exato com pino no Google Maps do seu celular ou computador.
+                  <p className="mt-0.5 text-emerald-800 text-[11px] sm:text-xs">
+                    Toque em qualquer ponto abaixo para abrir o local exato com pino no aplicativo Google Maps do celular.
                   </p>
                 </div>
               </div>
 
               {/* Lista de pontos e coordenadas */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto p-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3 max-h-[60vh] overflow-y-auto p-0.5">
                 {items
                   .filter((it) => it.lat !== 0 && it.lng !== 0)
                   .map((it) => (
                     <div
                       key={it.id}
-                      className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl hover:border-emerald-500 transition flex flex-col justify-between"
+                      className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl hover:border-emerald-500 transition flex flex-col justify-between shadow-xs"
                     >
                       <div>
                         <div className="flex items-center justify-between mb-1">
-                          <span className="font-bold font-mono text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded text-[11px]">
+                          <span className="font-bold font-mono text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded text-[11px]">
                             #{it.cod}
                           </span>
-                          <span className="text-[11px] font-bold text-zinc-700">
+                          <span className="text-xs font-bold text-zinc-800">
                             {it.qtdCx} cx ({it.qtdUnid} unid)
                           </span>
                         </div>
-                        <h4 className="font-bold text-xs text-zinc-900 line-clamp-1">
+                        <h4 className="font-bold text-xs sm:text-sm text-zinc-900 line-clamp-1">
                           {it.desc}
                         </h4>
-                        <div className="text-[11px] text-zinc-600 flex items-center gap-2 mt-1.5 font-mono">
-                          {it.pallet ? <span>{it.pallet} plt</span> : null}
-                          {it.lastro ? <span>• {it.lastro} lst</span> : null}
-                          {it.caixa ? <span>• {it.caixa} cx</span> : null}
-                          {it.unidade ? <span>• {it.unidade} un</span> : null}
+                        <div className="text-[11px] text-zinc-600 flex items-center gap-1.5 mt-1.5 font-mono flex-wrap">
+                          {it.pallet ? <span className="bg-white px-1.5 py-0.5 rounded border border-zinc-200">{it.pallet} plt</span> : null}
+                          {it.lastro ? <span className="bg-white px-1.5 py-0.5 rounded border border-zinc-200">{it.lastro} lst</span> : null}
+                          {it.caixa ? <span className="bg-white px-1.5 py-0.5 rounded border border-zinc-200">{it.caixa} cx</span> : null}
+                          {it.unidade ? <span className="bg-white px-1.5 py-0.5 rounded border border-zinc-200">{it.unidade} un</span> : null}
                         </div>
-                        <div className="text-[11px] text-zinc-500 flex items-center gap-2 mt-1">
+                        <div className="text-[11px] text-zinc-500 flex items-center gap-2 mt-1.5">
                           <span>📍 {it.lat.toFixed(5)}, {it.lng.toFixed(5)}</span>
                           {it.accuracy && <span>(±{it.accuracy}m)</span>}
                         </div>
@@ -1305,7 +1510,7 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
                           href={it.mapsUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-semibold flex items-center gap-1 shadow-sm transition"
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs transition min-h-[32px]"
                         >
                           <ExternalLink className="w-3 h-3" />
                           <span>Abrir no Google Maps</span>
@@ -1320,7 +1525,7 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
             <div className="p-3 bg-zinc-100 border-t border-zinc-200 flex justify-end">
               <button
                 onClick={() => setIsMapModalOpen(false)}
-                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold rounded-lg transition cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-900 text-white text-xs font-bold rounded-xl transition cursor-pointer min-h-[40px]"
               >
                 Fechar Visualização
               </button>
@@ -1331,36 +1536,36 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
 
       {/* MODAL: Confirmação de Aplicação no Estoque Físico */}
       {showApplyConfirmModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-zinc-200">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-4 sm:p-6 border border-zinc-200">
             <div className="flex items-center gap-3 text-amber-600 mb-3">
-              <span className="p-2.5 bg-amber-100 rounded-xl">
-                <AlertTriangle className="w-6 h-6 text-amber-700" />
+              <span className="p-2 sm:p-2.5 bg-amber-100 rounded-xl shrink-0">
+                <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-amber-700" />
               </span>
-              <h3 className="text-lg font-bold text-zinc-900 leading-tight">
+              <h3 className="text-base sm:text-lg font-bold text-zinc-900 leading-tight">
                 Aplicar Contagem ao Estoque Físico
               </h3>
             </div>
 
-            <p className="text-xs text-zinc-600 mb-4 leading-relaxed">
+            <p className="text-xs sm:text-sm text-zinc-600 mb-3 leading-relaxed">
               Deseja atualizar a coluna de <b>Inventário Físico (coluna b)</b> de{' '}
               <b>{stats.distinctCodigos} produtos</b> no sistema principal com as quantidades apuradas nesta contagem de campo?
             </p>
 
-            <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg text-xs text-amber-900 mb-5">
+            <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs text-amber-900 mb-4">
               Esta ação irá substituir as quantidades físicas atuais desses produtos pelos totais contados aqui com validação de GPS.
             </div>
 
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2">
               <button
                 onClick={() => setShowApplyConfirmModal(false)}
-                className="px-4 py-2 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 text-xs font-semibold rounded-lg transition cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold rounded-xl transition cursor-pointer min-h-[42px]"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleAplicarAoEstoque}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer flex items-center gap-1.5"
+                className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-black rounded-xl shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5 min-h-[42px]"
               >
                 <Check className="w-4 h-4" />
                 <span>Confirmar e Atualizar Estoque</span>
