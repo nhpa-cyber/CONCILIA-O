@@ -1,28 +1,26 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { RawData, CalculatedProduct, ContagemGpsItem, ResRow } from '../data/types';
 import {
   MapPin,
-  Navigation,
   Crosshair,
   Compass,
   CheckCircle2,
   AlertTriangle,
-  Download,
   Trash2,
   Plus,
   Search,
   ExternalLink,
   Layers,
-  ArrowRight,
   RefreshCw,
-  Eye,
   FileSpreadsheet,
   X,
   Info,
   Check,
-  Building2,
-  UserCheck
+  Package,
+  Boxes,
+  Box,
+  Settings2
 } from 'lucide-react';
 
 interface ContagemGpsViewProps {
@@ -40,6 +38,40 @@ interface CurrentLocationState {
   timestamp: number | null;
   error: string | null;
   loading: boolean;
+}
+
+interface PalletConfig {
+  cxPorLastro: number;
+  lastrosPorPallet: number;
+}
+
+/**
+ * Retorna a configuração padrão de paletização (lastro x camadas) com base no nome do produto
+ */
+function getDefaultPalletConfig(desc: string): PalletConfig {
+  const d = (desc || '').toUpperCase();
+  if (d.includes('600ML')) {
+    return { cxPorLastro: 12, lastrosPorPallet: 5 }; // 60 cx/palete
+  }
+  if (d.includes(' 1L') || d.includes('1 LITRO') || d.includes('GFA VD 1L')) {
+    return { cxPorLastro: 12, lastrosPorPallet: 4 }; // 48 cx/palete
+  }
+  if (d.includes('LT') || d.includes('LATA') || d.includes('269ML') || d.includes('350ML')) {
+    return { cxPorLastro: 15, lastrosPorPallet: 6 }; // 90 cx/palete
+  }
+  if (d.includes('LONG NECK') || d.includes('LN') || d.includes('355ML')) {
+    return { cxPorLastro: 14, lastrosPorPallet: 6 }; // 84 cx/palete
+  }
+  if (d.includes('PET 2L') || d.includes('2,0L') || d.includes('2L')) {
+    return { cxPorLastro: 16, lastrosPorPallet: 4 }; // 64 cx/palete
+  }
+  if (d.includes('PET 1L')) {
+    return { cxPorLastro: 12, lastrosPorPallet: 5 }; // 60 cx/palete
+  }
+  if (d.includes('KEG') || d.includes('BARRIL') || d.includes('50L') || d.includes('30L')) {
+    return { cxPorLastro: 4, lastrosPorPallet: 2 }; // 8 barris/palete
+  }
+  return { cxPorLastro: 12, lastrosPorPallet: 5 }; // Padrão genérico
 }
 
 export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
@@ -62,36 +94,78 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
   });
 
   const [watchId, setWatchId] = useState<number | null>(null);
-  const [autoTracking, setAutoTracking] = useState(true);
+  const [autoTracking] = useState(true);
 
-  // Formulário de Registro
+  // Formulário de Registro - Exclusivamente: Código do Produto, Pallet, Lastro, Caixa, Unidade
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<CalculatedProduct | null>(null);
-  const [qtdCx, setQtdCx] = useState<string>('');
-  const [qtdUnid, setQtdUnid] = useState<string>('');
-  const [setor, setSetor] = useState<string>('');
-  const [operador, setOperador] = useState<string>(() => localStorage.getItem('contagem_operador') || '');
-  const [observacao, setObservacao] = useState<string>('');
+  const [pallet, setPallet] = useState<string>('');
+  const [lastro, setLastro] = useState<string>('');
+  const [caixa, setCaixa] = useState<string>('');
+  const [unidade, setUnidade] = useState<string>('');
+
+  // Configuração de Paletização (Lastro x Camadas por Pallet)
+  const [cxPorLastro, setCxPorLastro] = useState<number>(12);
+  const [lastrosPorPallet, setLastrosPorPallet] = useState<number>(5);
+  const [showPalletConfig, setShowPalletConfig] = useState(false);
 
   // Filtros e busca na tabela de contagens realizadas
   const [filterQuery, setFilterQuery] = useState('');
-  const [selectedMapItem, setSelectedMapItem] = useState<ContagemGpsItem | null>(null);
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   const [showApplyConfirmModal, setShowApplyConfirmModal] = useState(false);
 
-  // Salva nome do operador para os próximos registros
+  // Atualiza configuração de palete ao selecionar produto
   useEffect(() => {
-    if (operador) {
-      localStorage.setItem('contagem_operador', operador);
+    if (selectedProduct) {
+      const savedCfg = localStorage.getItem(`pallet_cfg_${selectedProduct.c}`);
+      if (savedCfg) {
+        try {
+          const parsed = JSON.parse(savedCfg);
+          setCxPorLastro(parsed.cxPorLastro || 12);
+          setLastrosPorPallet(parsed.lastrosPorPallet || 5);
+          return;
+        } catch {
+          // ignora
+        }
+      }
+      const def = getDefaultPalletConfig(selectedProduct.d);
+      setCxPorLastro(def.cxPorLastro);
+      setLastrosPorPallet(def.lastrosPorPallet);
     }
-  }, [operador]);
+  }, [selectedProduct]);
 
-  // Função para capturar GPS único com alta precisão
+  // Função para salvar nova configuração personalizada de palete para o produto
+  const handleSavePalletConfig = (newCxLastro: number, newLastrosPallet: number) => {
+    setCxPorLastro(newCxLastro);
+    setLastrosPorPallet(newLastrosPallet);
+    if (selectedProduct) {
+      localStorage.setItem(
+        `pallet_cfg_${selectedProduct.c}`,
+        JSON.stringify({ cxPorLastro: newCxLastro, lastrosPorPallet: newLastrosPallet })
+      );
+    }
+  };
+
+  // Cálculos matemáticos em tempo real das quantidades apuradas
+  const pNum = parseFloat(pallet.replace(',', '.')) || 0;
+  const lNum = parseFloat(lastro.replace(',', '.')) || 0;
+  const cNum = parseFloat(caixa.replace(',', '.')) || 0;
+  const uNum = parseFloat(unidade.replace(',', '.')) || 0;
+
+  const cxPorPalletTotal = cxPorLastro * lastrosPorPallet;
+  const cxDePallets = pNum * cxPorPalletTotal;
+  const cxDeLastros = lNum * cxPorLastro;
+  const totalCxCalculado = Math.round(cxDePallets + cxDeLastros + cNum);
+
+  const fatorEmbalagem = selectedProduct ? (selectedProduct.H > 0 ? selectedProduct.H : 1) : 1;
+  const totalUnidCalculado = Math.round(totalCxCalculado * fatorEmbalagem + uNum);
+
+  // Capturar GPS único com alta precisão
   const requestLocation = () => {
     if (!navigator.geolocation) {
       setGps((prev) => ({
         ...prev,
-        error: 'Geolocalização não é suportada pelo seu navegador/dispositivo.',
+        error: 'Geolocalização não é suportada pelo seu dispositivo.',
         loading: false,
       }));
       return;
@@ -104,8 +178,8 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
         setGps({
           lat: position.coords.latitude,
           lng: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          altitude: position.coords.altitude,
+          accuracy: Math.round(position.coords.accuracy * 10) / 10,
+          altitude: position.coords.altitude ? Math.round(position.coords.altitude * 10) / 10 : null,
           timestamp: position.timestamp,
           error: null,
           loading: false,
@@ -134,7 +208,7 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
     );
   };
 
-  // Monitoramento contínuo em segundo plano quando ativo
+  // Monitoramento contínuo em segundo plano
   useEffect(() => {
     if (!autoTracking || !navigator.geolocation) return;
 
@@ -190,24 +264,23 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
   // Totais apurados
   const stats = useMemo(() => {
     const totalItens = items.length;
+    const totalPallets = items.reduce((acc, it) => acc + (it.pallet || 0), 0);
+    const totalLastros = items.reduce((acc, it) => acc + (it.lastro || 0), 0);
     const totalCx = items.reduce((acc, it) => acc + it.qtdCx, 0);
     const totalUnid = items.reduce((acc, it) => acc + it.qtdUnid, 0);
     const distinctCodigos = new Set(items.map((it) => it.cod)).size;
     const itemsComGps = items.filter((it) => it.lat !== 0 && it.lng !== 0).length;
-    return { totalItens, totalCx, totalUnid, distinctCodigos, itemsComGps };
+    return { totalItens, totalPallets, totalLastros, totalCx, totalUnid, distinctCodigos, itemsComGps };
   }, [items]);
 
-  // Filtra itens na tabela
+  // Filtra itens na tabela (apenas código ou descrição)
   const filteredItems = useMemo(() => {
     if (!filterQuery.trim()) return items;
     const q = filterQuery.toLowerCase().trim();
     return items.filter(
       (it) =>
         it.cod.toString().includes(q) ||
-        it.desc.toLowerCase().includes(q) ||
-        (it.setor && it.setor.toLowerCase().includes(q)) ||
-        (it.operador && it.operador.toLowerCase().includes(q)) ||
-        (it.observacao && it.observacao.toLowerCase().includes(q))
+        it.desc.toLowerCase().includes(q)
     );
   }, [items, filterQuery]);
 
@@ -218,13 +291,8 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
       return;
     }
 
-    const cxNum = parseFloat(qtdCx.replace(',', '.')) || 0;
-    const unidAvulsas = parseFloat(qtdUnid.replace(',', '.')) || 0;
-    const fator = selectedProduct.H > 0 ? selectedProduct.H : 1;
-    const totalUnidades = Math.round(cxNum * fator + unidAvulsas);
-
-    if (cxNum <= 0 && unidAvulsas <= 0) {
-      alert('Informe a quantidade de caixas ou unidades contadas.');
+    if (totalCxCalculado <= 0 && uNum <= 0) {
+      alert('Informe a quantidade contada (Pallet, Lastro, Caixa ou Unidade).');
       return;
     }
 
@@ -252,12 +320,13 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
       cod: selectedProduct.c,
       desc: selectedProduct.d,
       tipo: selectedProduct.t || 'cx',
-      fatorCx: fator,
-      qtdCx: cxNum,
-      qtdUnid: totalUnidades,
-      observacao: observacao.trim() || undefined,
-      setor: setor.trim() || undefined,
-      operador: operador.trim() || undefined,
+      fatorCx: fatorEmbalagem,
+      pallet: pNum > 0 ? pNum : undefined,
+      lastro: lNum > 0 ? lNum : undefined,
+      caixa: cNum > 0 ? cNum : undefined,
+      unidade: uNum > 0 ? uNum : undefined,
+      qtdCx: totalCxCalculado,
+      qtdUnid: totalUnidCalculado,
       lat,
       lng,
       accuracy,
@@ -287,9 +356,10 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
     // Limpa campos do formulário para o próximo item
     setSelectedProduct(null);
     setSearchQuery('');
-    setQtdCx('');
-    setQtdUnid('');
-    setObservacao('');
+    setPallet('');
+    setLastro('');
+    setCaixa('');
+    setUnidade('');
   };
 
   // Excluir um registro de contagem
@@ -361,7 +431,7 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
     }
   };
 
-  // Exportar para Excel (.xlsx) com todas as coordenadas, precisão e link do Google Maps
+  // Exportar para Excel (.xlsx) com Pallet, Lastro, Caixa, Unidade e Coordenadas GPS
   const handleExportXLSX = () => {
     if (items.length === 0) {
       alert('Não há contagens para exportar.');
@@ -374,17 +444,18 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
       'Descrição': it.desc,
       'Tipo': it.tipo,
       'Fator Cx': it.fatorCx,
-      'Qtd Cx': it.qtdCx,
+      'Pallet': it.pallet || 0,
+      'Lastro': it.lastro || 0,
+      'Caixa': it.caixa || 0,
+      'Unidade': it.unidade || 0,
+      'Total Caixas': it.qtdCx,
       'Total Unidades': it.qtdUnid,
-      'Setor / Localização Armazém': it.setor || '-',
-      'Operador': it.operador || '-',
       'Data e Hora do Registro': it.dataHora,
       'Latitude': it.lat !== 0 ? it.lat : 'Não capturado',
       'Longitude': it.lng !== 0 ? it.lng : 'Não capturado',
       'Precisão GPS (metros)': it.accuracy ? `±${it.accuracy}m` : '-',
       'Altitude (m)': it.altitude ? `${it.altitude}m` : '-',
       'Link Google Maps': it.mapsUrl || '-',
-      'Observação': it.observacao || '-',
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -395,7 +466,7 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
     XLSX.writeFile(wb, fileName);
   };
 
-  // Helper para cor da precisão do GPS
+  // Helper para badge de precisão do GPS
   const getAccuracyBadge = (acc: number | null) => {
     if (acc === null || acc === 0) {
       return (
@@ -446,7 +517,7 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
                   </span>
                 </h1>
                 <p className="text-xs sm:text-sm text-zinc-300">
-                  Rastreamento geográfico exato de onde cada produto do estoque físico foi bipado ou contado no galpão/loja
+                  Rastreamento geográfico exato de onde cada produto do estoque físico foi bipado ou contado no galpão
                 </p>
               </div>
             </div>
@@ -530,7 +601,7 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
               {stats.totalCx.toLocaleString('pt-BR')}
             </span>
             <span className="text-[11px] text-zinc-400 mt-0.5">
-              Volume em cx físicas
+              Volume em cx físicas apuradas
             </span>
           </div>
 
@@ -561,7 +632,7 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
           </div>
         </div>
 
-        {/* Bloco 1: Formulário de Registro Rápido */}
+        {/* Formulário de Registro com Campos Solicitados: Código do Produto, Pallet, Lastro, Caixa, Unidade */}
         <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 sm:p-6 mb-6">
           <div className="flex items-center justify-between pb-4 border-b border-zinc-100 mb-4">
             <div className="flex items-center gap-2">
@@ -573,7 +644,7 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
                   Registrar Nova Contagem Física com GPS
                 </h2>
                 <p className="text-xs text-zinc-500">
-                  Selecione o produto, insira as caixas e clique no botão para capturar a posição do celular instantaneamente.
+                  Informe o Código do Produto, Pallet, Lastro, Caixa e Unidade para gravar a localização exata no galpão.
                 </p>
               </div>
             </div>
@@ -589,11 +660,11 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-            {/* Campo 1: Busca de Produto */}
-            <div className="md:col-span-6 relative">
+          <div className="space-y-4">
+            {/* Campo 1: Código do Produto (Busca & Seleção) */}
+            <div className="relative">
               <label className="block text-xs font-bold text-zinc-700 uppercase mb-1">
-                Buscar Produto (Código ou Descrição) *
+                Código do Produto (Buscar por Código ou Descrição) *
               </label>
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-3 text-zinc-400" />
@@ -606,7 +677,7 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
                       setSelectedProduct(null);
                     }
                   }}
-                  placeholder="Ex: 25303 ou HEINEKEN ou SKOL..."
+                  placeholder="Digite o código (ex: 25303) ou o nome do produto..."
                   className="w-full pl-9 pr-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-lg text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
                 />
               </div>
@@ -638,120 +709,292 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
                 </div>
               )}
 
-              {/* Informação do produto selecionado */}
+              {/* Informação do produto selecionado com padrão de palete configurável */}
               {selectedProduct && (
-                <div className="mt-2 p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-lg flex items-center justify-between text-xs">
+                <div className="mt-2 p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                   <div>
-                    <span className="font-bold text-emerald-900 font-mono mr-1.5">
-                      #{selectedProduct.c}
-                    </span>
-                    <span className="font-medium text-emerald-950">{selectedProduct.d}</span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-emerald-900 font-mono bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">
+                        #{selectedProduct.c}
+                      </span>
+                      <span className="font-bold text-emerald-950">{selectedProduct.d}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1 text-[11px] text-emerald-800">
+                      <span>Embalagem: <b>1 Cx = {fatorEmbalagem} unid</b></span>
+                      <span>•</span>
+                      <span>
+                        Padrão do Palete: <b>{cxPorLastro} cx/lastro</b> × <b>{lastrosPorPallet} lastros</b> ={' '}
+                        <b className="text-emerald-900 font-bold">{cxPorPalletTotal} cx/palete</b>
+                      </span>
+                    </div>
                   </div>
-                  <span className="font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
-                    1 Cx = {selectedProduct.H} unid
-                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPalletConfig(!showPalletConfig)}
+                    className="self-start sm:self-auto px-2.5 py-1 text-[11px] font-semibold text-emerald-800 bg-white border border-emerald-300 hover:bg-emerald-100 rounded-lg transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <Settings2 className="w-3.5 h-3.5" />
+                    <span>{showPalletConfig ? 'Ocultar Padrão' : 'Ajustar Lastro/Palete'}</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Painel expansível de personalização de lastro e camadas por palete */}
+              {selectedProduct && showPalletConfig && (
+                <div className="mt-2 p-3 bg-zinc-100 border border-zinc-300 rounded-xl text-xs space-y-2">
+                  <div className="font-bold text-zinc-700 flex items-center gap-1">
+                    <Boxes className="w-4 h-4 text-emerald-600" />
+                    <span>Configuração de Empilhamento do Palete para este Produto:</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-zinc-600 mb-1">
+                        Caixas por Lastro (Camada)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={cxPorLastro}
+                        onChange={(e) => handleSavePalletConfig(Math.max(1, parseInt(e.target.value) || 1), lastrosPorPallet)}
+                        className="w-full px-2.5 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-zinc-600 mb-1">
+                        Lastros por Pallet (Altura / Camadas)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={lastrosPorPallet}
+                        onChange={(e) => handleSavePalletConfig(cxPorLastro, Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-full px-2.5 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 italic">
+                    * Total calculado: {cxPorLastro} cx/lastro × {lastrosPorPallet} lastros = {cxPorLastro * lastrosPorPallet} caixas em 1 palete completo.
+                  </p>
                 </div>
               )}
             </div>
 
-            {/* Campo 2: Quantidade de Caixas */}
-            <div className="md:col-span-3">
-              <label className="block text-xs font-bold text-zinc-700 uppercase mb-1">
-                Qtd. Caixas (Cx) *
-              </label>
-              <input
-                type="number"
-                step="any"
-                min="0"
-                value={qtdCx}
-                onChange={(e) => setQtdCx(e.target.value)}
-                placeholder="Ex: 50"
-                className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-lg text-sm font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
-              />
-              {/* Botões de atalho rápido */}
-              <div className="flex gap-1.5 mt-1.5">
-                {[1, 5, 10, 25, 50].map((val) => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => {
-                      const cur = parseFloat(qtdCx) || 0;
-                      setQtdCx(String(cur + val));
-                    }}
-                    className="px-2 py-0.5 text-[10px] font-bold bg-zinc-100 hover:bg-emerald-100 text-zinc-700 hover:text-emerald-800 rounded border border-zinc-200 transition cursor-pointer"
-                  >
-                    +{val}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Campo 3: Unidades Avulsas */}
-            <div className="md:col-span-3">
-              <label className="block text-xs font-bold text-zinc-700 uppercase mb-1">
-                Unidades Avulsas (Opcional)
-              </label>
-              <input
-                type="number"
-                step="1"
-                min="0"
-                value={qtdUnid}
-                onChange={(e) => setQtdUnid(e.target.value)}
-                placeholder="Ex: 6"
-                className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-lg text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
-              />
-              <span className="text-[10px] text-zinc-400 block mt-1">
-                Garrafas ou latas fora da caixa
-              </span>
-            </div>
-
-            {/* Campo 4: Setor / Rua do Galpão */}
-            <div className="md:col-span-4">
-              <label className="block text-xs font-bold text-zinc-700 uppercase mb-1">
-                Setor / Rua do Galpão
-              </label>
-              <div className="relative">
-                <Building2 className="w-4 h-4 absolute left-3 top-3 text-zinc-400" />
+            {/* Grid dos 4 campos solicitados: Pallet, Lastro, Caixa e Unidade */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+              {/* Campo 2: Pallet */}
+              <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-zinc-800 uppercase flex items-center gap-1">
+                    <Boxes className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Pallet</span>
+                  </label>
+                  <span className="text-[10px] text-zinc-500 font-medium">
+                    {cxPorPalletTotal} cx/plt
+                  </span>
+                </div>
                 <input
-                  type="text"
-                  value={setor}
-                  onChange={(e) => setSetor(e.target.value)}
-                  placeholder="Ex: Rua A - Palete 12 ou Pátio"
-                  className="w-full pl-9 pr-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={pallet}
+                  onChange={(e) => setPallet(e.target.value)}
+                  placeholder="0"
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm font-black text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
                 />
+                {/* Atalhos Rápidos */}
+                <div className="flex gap-1 mt-1.5 flex-wrap">
+                  {[1, 2, 5, 10].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => {
+                        const cur = parseFloat(pallet) || 0;
+                        setPallet(String(cur + val));
+                      }}
+                      className="px-1.5 py-0.5 text-[10px] font-bold bg-white hover:bg-emerald-100 text-zinc-700 hover:text-emerald-800 rounded border border-zinc-200 transition cursor-pointer"
+                    >
+                      +{val}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-[10px] text-zinc-400 block mt-1">
+                  Paletes cheios
+                </span>
               </div>
-            </div>
 
-            {/* Campo 5: Operador / Conferente */}
-            <div className="md:col-span-4">
-              <label className="block text-xs font-bold text-zinc-700 uppercase mb-1">
-                Conferente / Operador
-              </label>
-              <div className="relative">
-                <UserCheck className="w-4 h-4 absolute left-3 top-3 text-zinc-400" />
+              {/* Campo 3: Lastro */}
+              <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-zinc-800 uppercase flex items-center gap-1">
+                    <Layers className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Lastro</span>
+                  </label>
+                  <span className="text-[10px] text-zinc-500 font-medium">
+                    {cxPorLastro} cx/lst
+                  </span>
+                </div>
                 <input
-                  type="text"
-                  value={operador}
-                  onChange={(e) => setOperador(e.target.value)}
-                  placeholder="Ex: João / Conferente 01"
-                  className="w-full pl-9 pr-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={lastro}
+                  onChange={(e) => setLastro(e.target.value)}
+                  placeholder="0"
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm font-black text-teal-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
                 />
+                {/* Atalhos Rápidos */}
+                <div className="flex gap-1 mt-1.5 flex-wrap">
+                  {[1, 2, 3, 4].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => {
+                        const cur = parseFloat(lastro) || 0;
+                        setLastro(String(cur + val));
+                      }}
+                      className="px-1.5 py-0.5 text-[10px] font-bold bg-white hover:bg-teal-100 text-zinc-700 hover:text-teal-800 rounded border border-zinc-200 transition cursor-pointer"
+                    >
+                      +{val}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-[10px] text-zinc-400 block mt-1">
+                  Camadas soltas
+                </span>
+              </div>
+
+              {/* Campo 4: Caixa */}
+              <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-zinc-800 uppercase flex items-center gap-1">
+                    <Package className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Caixa</span>
+                  </label>
+                  <span className="text-[10px] text-zinc-500 font-medium">
+                    {fatorEmbalagem} unid/cx
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={caixa}
+                  onChange={(e) => setCaixa(e.target.value)}
+                  placeholder="0"
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm font-black text-blue-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+                />
+                {/* Atalhos Rápidos */}
+                <div className="flex gap-1 mt-1.5 flex-wrap">
+                  {[1, 5, 10, 20].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => {
+                        const cur = parseFloat(caixa) || 0;
+                        setCaixa(String(cur + val));
+                      }}
+                      className="px-1.5 py-0.5 text-[10px] font-bold bg-white hover:bg-blue-100 text-zinc-700 hover:text-blue-800 rounded border border-zinc-200 transition cursor-pointer"
+                    >
+                      +{val}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-[10px] text-zinc-400 block mt-1">
+                  Caixas avulsas
+                </span>
+              </div>
+
+              {/* Campo 5: Unidade */}
+              <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-zinc-800 uppercase flex items-center gap-1">
+                    <Box className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Unidade</span>
+                  </label>
+                  <span className="text-[10px] text-zinc-500 font-medium">
+                    Avulsas
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={unidade}
+                  onChange={(e) => setUnidade(e.target.value)}
+                  placeholder="0"
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm font-black text-amber-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+                />
+                {/* Atalhos Rápidos */}
+                <div className="flex gap-1 mt-1.5 flex-wrap">
+                  {[1, 2, 6, 12].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => {
+                        const cur = parseFloat(unidade) || 0;
+                        setUnidade(String(cur + val));
+                      }}
+                      className="px-1.5 py-0.5 text-[10px] font-bold bg-white hover:bg-amber-100 text-zinc-700 hover:text-amber-800 rounded border border-zinc-200 transition cursor-pointer"
+                    >
+                      +{val}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-[10px] text-zinc-400 block mt-1">
+                  Garrafas/latas soltas
+                </span>
               </div>
             </div>
 
-            {/* Campo 6: Observação */}
-            <div className="md:col-span-4">
-              <label className="block text-xs font-bold text-zinc-700 uppercase mb-1">
-                Observação
-              </label>
-              <input
-                type="text"
-                value={observacao}
-                onChange={(e) => setObservacao(e.target.value)}
-                placeholder="Ex: Palete misto, avarias, etc."
-                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
-              />
-            </div>
+            {/* Resumo da Apuração em Tempo Real */}
+            {(pNum > 0 || lNum > 0 || cNum > 0 || uNum > 0) && (
+              <div className="p-3 bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 border border-emerald-200 rounded-xl text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-inner">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-emerald-900 uppercase text-[10px] tracking-wide block">
+                    Cálculo da Apuração em Tempo Real
+                  </span>
+                  <div className="text-zinc-700 flex items-center gap-1.5 flex-wrap font-mono text-[11px]">
+                    {pNum > 0 && (
+                      <span className="bg-white px-1.5 py-0.5 rounded border border-zinc-200">
+                        <b>{pNum}</b> plt ({cxDePallets} cx)
+                      </span>
+                    )}
+                    {lNum > 0 && (
+                      <span className="bg-white px-1.5 py-0.5 rounded border border-zinc-200">
+                        + <b>{lNum}</b> lst ({cxDeLastros} cx)
+                      </span>
+                    )}
+                    {cNum > 0 && (
+                      <span className="bg-white px-1.5 py-0.5 rounded border border-zinc-200">
+                        + <b>{cNum}</b> cx avulsa
+                      </span>
+                    )}
+                    {uNum > 0 && (
+                      <span className="bg-white px-1.5 py-0.5 rounded border border-zinc-200">
+                        + <b>{uNum}</b> unid avulsa
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 bg-white px-3 py-2 rounded-lg border border-emerald-300 shadow-xs">
+                  <div>
+                    <span className="text-[10px] font-semibold text-zinc-500 uppercase block">Total Caixas</span>
+                    <span className="text-lg font-black text-emerald-700 leading-tight">
+                      {totalCxCalculado.toLocaleString('pt-BR')} cx
+                    </span>
+                  </div>
+                  <div className="w-px h-8 bg-zinc-200" />
+                  <div>
+                    <span className="text-[10px] font-semibold text-zinc-500 uppercase block">Total Unidades</span>
+                    <span className="text-lg font-black text-blue-700 leading-tight">
+                      {totalUnidCalculado.toLocaleString('pt-BR')} unid
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Botão de Registro com GPS */}
@@ -759,7 +1002,7 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
             <div className="text-xs text-zinc-500 flex items-center gap-1.5">
               <Info className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>
-                Ao clicar em registrar, a localização precisa do smartphone e o horário atual serão gravados junto ao produto.
+                Ao clicar em registrar, as coordenadas precisas do celular e o horário serão gravados junto à contagem física.
               </span>
             </div>
 
@@ -790,7 +1033,7 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
               onClick={() => setIsMapModalOpen(true)}
               disabled={items.length === 0}
               className="px-3.5 py-2 bg-teal-800 hover:bg-teal-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer disabled:opacity-40"
-              title="Visualizar mapa de calor e pinos dos produtos contados"
+              title="Visualizar mapa com pinos dos produtos contados"
             >
               <Compass className="w-4 h-4 text-teal-300" />
               <span>Ver Mapa da Contagem</span>
@@ -801,7 +1044,7 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
               onClick={handleExportXLSX}
               disabled={items.length === 0}
               className="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer disabled:opacity-40"
-              title="Baixar planilha Excel com todas as colunas de GPS e links"
+              title="Baixar planilha Excel com Pallet, Lastro, Caixa, Unidade e coordenadas GPS"
             >
               <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
               <span>Exportar Excel (XLSX)</span>
@@ -839,13 +1082,13 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
               type="text"
               value={filterQuery}
               onChange={(e) => setFilterQuery(e.target.value)}
-              placeholder="Filtrar por código, descrição, setor, conferente ou observação..."
+              placeholder="Filtrar por código ou descrição do produto..."
               className="w-full pl-9 pr-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
             />
           </div>
         </div>
 
-        {/* Tabela de Produtos Contados com Geolocalização */}
+        {/* Tabela de Produtos Contados com Pallet, Lastro, Caixa, Unidade e GPS */}
         <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
           {filteredItems.length === 0 ? (
             <div className="p-12 text-center text-zinc-400">
@@ -864,9 +1107,12 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
                   <tr className="bg-zinc-100 text-zinc-700 font-bold border-b border-zinc-200 uppercase tracking-wider">
                     <th className="p-3 text-center w-12">#</th>
                     <th className="p-3">Código & Descrição</th>
-                    <th className="p-3 text-right">Qtd. Cx</th>
+                    <th className="p-3 text-center">Pallet</th>
+                    <th className="p-3 text-center">Lastro</th>
+                    <th className="p-3 text-center">Caixa</th>
+                    <th className="p-3 text-center">Unidade</th>
+                    <th className="p-3 text-right">Total Cx</th>
                     <th className="p-3 text-right">Total Unid</th>
-                    <th className="p-3">Setor / Rua</th>
                     <th className="p-3">Data / Hora</th>
                     <th className="p-3">Geolocalização (GPS)</th>
                     <th className="p-3 text-center">Google Maps</th>
@@ -889,10 +1135,41 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
                             </span>
                             <span className="font-bold text-zinc-900">{item.desc}</span>
                           </div>
-                          {item.observacao && (
-                            <p className="text-[11px] text-zinc-500 italic mt-0.5">
-                              Obs: {item.observacao}
-                            </p>
+                        </td>
+                        <td className="p-3 text-center font-mono font-bold text-emerald-800">
+                          {item.pallet !== undefined && item.pallet > 0 ? (
+                            <span className="bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                              {item.pallet} plt
+                            </span>
+                          ) : (
+                            <span className="text-zinc-300">-</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-center font-mono font-bold text-teal-800">
+                          {item.lastro !== undefined && item.lastro > 0 ? (
+                            <span className="bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                              {item.lastro} lst
+                            </span>
+                          ) : (
+                            <span className="text-zinc-300">-</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-center font-mono font-bold text-blue-800">
+                          {item.caixa !== undefined && item.caixa > 0 ? (
+                            <span className="bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                              {item.caixa} cx
+                            </span>
+                          ) : (
+                            <span className="text-zinc-300">-</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-center font-mono font-bold text-amber-800">
+                          {item.unidade !== undefined && item.unidade > 0 ? (
+                            <span className="bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                              {item.unidade} un
+                            </span>
+                          ) : (
+                            <span className="text-zinc-300">-</span>
                           )}
                         </td>
                         <td className="p-3 text-right font-black text-sm text-emerald-700">
@@ -900,21 +1177,6 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
                         </td>
                         <td className="p-3 text-right font-bold text-zinc-700">
                           {item.qtdUnid.toLocaleString('pt-BR')} unid
-                        </td>
-                        <td className="p-3">
-                          {item.setor ? (
-                            <span className="inline-flex items-center gap-1 font-medium text-zinc-700 bg-zinc-100 px-2 py-0.5 rounded">
-                              <Building2 className="w-3 h-3 text-zinc-500" />
-                              {item.setor}
-                            </span>
-                          ) : (
-                            <span className="text-zinc-400 italic">-</span>
-                          )}
-                          {item.operador && (
-                            <div className="text-[10px] text-zinc-500 mt-0.5">
-                              Por: {item.operador}
-                            </div>
-                          )}
                         </td>
                         <td className="p-3 text-zinc-600 whitespace-nowrap font-mono text-[11px]">
                           {item.dataHora}
@@ -1023,15 +1285,16 @@ export const ContagemGpsView: React.FC<ContagemGpsViewProps> = ({
                         <h4 className="font-bold text-xs text-zinc-900 line-clamp-1">
                           {it.desc}
                         </h4>
+                        <div className="text-[11px] text-zinc-600 flex items-center gap-2 mt-1.5 font-mono">
+                          {it.pallet ? <span>{it.pallet} plt</span> : null}
+                          {it.lastro ? <span>• {it.lastro} lst</span> : null}
+                          {it.caixa ? <span>• {it.caixa} cx</span> : null}
+                          {it.unidade ? <span>• {it.unidade} un</span> : null}
+                        </div>
                         <div className="text-[11px] text-zinc-500 flex items-center gap-2 mt-1">
                           <span>📍 {it.lat.toFixed(5)}, {it.lng.toFixed(5)}</span>
                           {it.accuracy && <span>(±{it.accuracy}m)</span>}
                         </div>
-                        {it.setor && (
-                          <div className="text-[10px] text-zinc-600 mt-1 bg-zinc-100 inline-block px-1.5 py-0.5 rounded">
-                            Setor: {it.setor}
-                          </div>
-                        )}
                       </div>
 
                       <div className="mt-3 pt-2 border-t border-zinc-200 flex items-center justify-between">

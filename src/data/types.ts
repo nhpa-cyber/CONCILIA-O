@@ -136,6 +136,10 @@ export interface ContagemGpsItem {
   desc: string;
   tipo: string;
   fatorCx: number;
+  pallet?: number;
+  lastro?: number;
+  caixa?: number;
+  unidade?: number;
   qtdCx: number;
   qtdUnid: number;
   observacao?: string;
