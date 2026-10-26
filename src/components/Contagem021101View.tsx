@@ -931,21 +931,21 @@ export const Contagem021101View: React.FC<Contagem021101ViewProps> = ({
 
             {/* TABELA DE DADOS */}
             <div className="overflow-x-auto max-h-[580px] overflow-y-auto">
-              <table className="w-full text-xs text-left border-collapse">
+              <table className="w-full text-xs text-center border-collapse">
                 <thead className="bg-slate-100 text-slate-700 uppercase font-bold sticky top-0 z-10 border-b border-slate-200 text-[11px] tracking-wider">
                   <tr>
-                    <th className="py-3 px-3 w-28">Código</th>
-                    <th className="py-3 px-4 min-w-[240px]">Descrição</th>
+                    <th className="py-3 px-3 w-28 text-center">Código</th>
+                    <th className="py-3 px-4 min-w-[240px] text-center">Descrição</th>
                     <th className="py-3 px-3 w-40 text-center">Status</th>
                     {comparativeData.countsList.map((c, idx) => (
-                      <th key={c.id || idx} className="py-3 px-3 text-right min-w-[120px]">
+                      <th key={c.id || idx} className="py-3 px-3 text-center min-w-[120px]">
                         <div>{c.label}</div>
-                        <div className="text-[9px] font-normal text-slate-500 normal-case truncate max-w-[140px]">
+                        <div className="text-[9px] font-normal text-slate-500 normal-case truncate max-w-[140px] mx-auto">
                           {c.fileName || '02.11.01'}
                         </div>
                       </th>
                     ))}
-                    <th className="py-3 px-3 text-right w-32 bg-slate-200/60">
+                    <th className="py-3 px-3 text-center w-32 bg-slate-200/60">
                       Saldo Confirmado
                     </th>
                   </tr>
@@ -966,32 +966,34 @@ export const Contagem021101View: React.FC<Contagem021101ViewProps> = ({
                         <tr key={item.code} className="hover:bg-slate-50/80 transition">
                           
                           {/* CÓDIGO */}
-                          <td className="py-2 px-3 font-mono font-semibold text-slate-800">
-                            <div>{item.code}</div>
-                            <div className="text-[10px] text-slate-400 font-normal">
-                              #{item.cleanCode}
+                          <td className="py-2 px-3 font-mono font-semibold text-slate-800 text-center">
+                            <div className="flex flex-col items-center justify-center">
+                              <div>{item.code}</div>
+                              <div className="text-[10px] text-slate-400 font-normal">
+                                #{item.cleanCode}
+                              </div>
                             </div>
                           </td>
 
                           {/* DESCRIÇÃO */}
-                          <td className="py-2 px-4 text-slate-800 font-medium">
+                          <td className="py-2 px-4 text-slate-800 font-medium text-center">
                             {item.desc}
                           </td>
 
                           {/* STATUS GERAL */}
                           <td className="py-2 px-3 text-center">
                             {item.isMatched ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              <span className="inline-flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
                                 <CheckCircle2 size={12} className="text-emerald-700" />
                                 <span>Bateu (Cont. {item.matchedInRound})</span>
                               </span>
                             ) : item.divergentInLast ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                              <span className="inline-flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
                                 <AlertTriangle size={12} className="text-amber-700" />
                                 <span>Divergente</span>
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                              <span className="inline-flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
                                 <span>1ª Contagem</span>
                               </span>
                             )}
@@ -1028,7 +1030,7 @@ export const Contagem021101View: React.FC<Contagem021101ViewProps> = ({
                             return (
                               <td
                                 key={cIdx}
-                                className={`py-2 px-3 text-right font-mono transition ${
+                                className={`py-2 px-3 text-center font-mono transition ${
                                   isMatchWithPrev
                                     ? 'bg-emerald-100/90 text-emerald-950 font-bold border-x border-emerald-300'
                                     : isDivergentWithPrev
@@ -1039,7 +1041,7 @@ export const Contagem021101View: React.FC<Contagem021101ViewProps> = ({
                                 }`}
                               >
                                 {val !== null ? (
-                                  <div className="flex items-center justify-end gap-1.5">
+                                  <div className="flex items-center justify-center gap-1.5">
                                     <span>{val.toLocaleString('pt-BR')}</span>
                                     {isMatchWithPrev && (
                                       <span 
@@ -1059,24 +1061,24 @@ export const Contagem021101View: React.FC<Contagem021101ViewProps> = ({
                                     )}
                                   </div>
                                 ) : wasAlreadyConfirmed ? (
-                                  <span className="text-[10px] text-emerald-600/80 font-sans" title="Dispensado de recontagem pois já bateu anteriormente">
+                                  <span className="text-[10px] text-emerald-600/80 font-sans block text-center" title="Dispensado de recontagem pois já bateu anteriormente">
                                     — (Confirmado)
                                   </span>
                                 ) : (
-                                  <span className="text-slate-300">—</span>
+                                  <span className="text-slate-300 block text-center">—</span>
                                 )}
                               </td>
                             );
                           })}
 
                           {/* SALDO CONFIRMADO */}
-                          <td className="py-2 px-3 text-right font-mono font-bold bg-slate-50 border-l border-slate-200">
+                          <td className="py-2 px-3 text-center font-mono font-bold bg-slate-50 border-l border-slate-200">
                             {item.confirmedQty !== null ? (
-                              <span className="text-emerald-700">
+                              <span className="text-emerald-700 inline-block">
                                 {item.confirmedQty.toLocaleString('pt-BR')}
                               </span>
                             ) : (
-                              <span className="text-amber-600 font-sans text-[11px] font-semibold">
+                              <span className="text-amber-600 font-sans text-[11px] font-semibold inline-block">
                                 Pendente
                               </span>
                             )}

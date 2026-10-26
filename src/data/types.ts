@@ -127,6 +127,27 @@ export interface RawData {
       importedAt: string;
     }[];
   };
+  contagemGps?: ContagemGpsItem[];
+}
+
+export interface ContagemGpsItem {
+  id: string;
+  cod: number;
+  desc: string;
+  tipo: string;
+  fatorCx: number;
+  qtdCx: number;
+  qtdUnid: number;
+  observacao?: string;
+  setor?: string;
+  lat: number;
+  lng: number;
+  accuracy: number; // precisão do GPS em metros
+  altitude?: number | null;
+  timestamp: number;
+  dataHora: string;
+  mapsUrl: string;
+  operador?: string;
 }
 
 export interface CalculatedProduct {

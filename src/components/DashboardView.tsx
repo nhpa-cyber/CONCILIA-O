@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { RawData, CalculatedProduct, DashboardSnapshot } from '../data/types';
 import { N, Rt, RenderMoney } from '../utils/formatters';
 import { calculateProducts, sum } from '../utils/calc';
@@ -88,6 +88,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [selectedSnapshot, setSelectedSnapshot] = useState<DashboardSnapshot | null>(null);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [saveModalInitialDate, setSaveModalInitialDate] = useState<string | undefined>(undefined);
+  const [showDevolucaoReminder, setShowDevolucaoReminder] = useState(false);
+
+  // Fecha o popup com Escape e confirma com Enter
+  useEffect(() => {
+    if (!showDevolucaoReminder) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowDevolucaoReminder(false);
+      } else if (e.key === 'Enter') {
+        setShowDevolucaoReminder(false);
+        onOpenImport020502?.();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showDevolucaoReminder, onOpenImport020502]);
 
   const [selectedItemForAction, setSelectedItemForAction] = useState<{
     code: number;
@@ -1438,7 +1454,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 gap: '5px',
                 width: '100%',
               }}
-              onClick={onOpenImport020502}
+              onClick={() => setShowDevolucaoReminder(true)}
+              title="Importar 02.05.02 (Rotina de devolução 02-01-06)"
             >
               <span>📥</span>
               <span>IMPORTAR 02.05.02</span>
@@ -1778,6 +1795,152 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           onSaveSnapshot?.(snapshot);
         }}
       />
+
+      {/* POPUP DE LEMBRETE: ROTINA DE DEVOLUÇÃO 02-01-06 */}
+      {showDevolucaoReminder && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 999999,
+            padding: '16px',
+            animation: 'fadeIn 0.15s ease-out',
+          }}
+          onClick={() => setShowDevolucaoReminder(false)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '12px',
+              maxWidth: '460px',
+              width: '100%',
+              boxShadow: '0 20px 35px -5px rgba(0, 0, 0, 0.3), 0 10px 15px -5px rgba(0, 0, 0, 0.2)',
+              border: '2px solid #EAB308',
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Cabeçalho */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #FEF08A 0%, #FDE047 100%)',
+                borderBottom: '1px solid #FACC15',
+                padding: '14px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '22px' }}>⚠️</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold', color: '#713F12' }}>
+                    Lembrete Importante
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '11px', color: '#854D0E' }}>
+                    Importação do Relatório 02.05.02
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDevolucaoReminder(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#854D0E',
+                  padding: '4px',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Fechar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Conteúdo */}
+            <div style={{ padding: '20px' }}>
+              <div
+                style={{
+                  background: '#FEF9C3',
+                  border: '1.5px solid #FACC15',
+                  borderRadius: '8px',
+                  padding: '14px 16px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '12px',
+                }}
+              >
+                <span style={{ fontSize: '22px', lineHeight: 1 }}>📢</span>
+                <div style={{ fontSize: '13.5px', color: '#713F12', lineHeight: '1.5' }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>
+                    Executar a rotina de devolução 02-01-06
+                  </div>
+                  Antes de importar o relatório <b>02.05.02</b>, certifique-se de executar a rotina de devolução <b>02-01-06</b> no Promax para conciliar as devoluções e os estoques corretamente.
+                </div>
+              </div>
+
+              <p style={{ margin: '0 0 18px', fontSize: '12px', color: '#64748B', textAlign: 'center' }}>
+                Deseja prosseguir com a importação agora?
+              </p>
+
+              {/* Ações */}
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowDevolucaoReminder(false)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: '1px solid #CBD5E1',
+                    background: '#F1F5F9',
+                    color: '#475569',
+                    fontWeight: 600,
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDevolucaoReminder(false);
+                    onOpenImport020502?.();
+                  }}
+                  style={{
+                    padding: '8px 20px',
+                    borderRadius: '6px',
+                    border: '1px solid #D97706',
+                    background: 'linear-gradient(180deg, #F59E0B 0%, #D97706 100%)',
+                    color: '#ffffff',
+                    fontWeight: 'bold',
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 4px rgba(217, 119, 6, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <span>Prosseguir com a Importação</span>
+                  <span>➔</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* POPUP FLUTUANTE EXPANDIDO E INFORMATIVO (COMPARATIVO ONTEM VS HOJE) */}
       {hoveredItem && (

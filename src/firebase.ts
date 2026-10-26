@@ -44,7 +44,7 @@ export async function saveStateToFirestore(data: RawData, actionName?: string, d
     const mainDocRef = doc(db, STATE_COLLECTION, MAIN_DOC);
     const ecDocRef = doc(db, STATE_COLLECTION, EC_DOC);
 
-    // Salva o estado completo, dividido em partes para evitar limite de 1MB do Firestore
+    // Salva o estado completo, dividido em partes seguras de ~700KB
     const fullPayload = JSON.stringify({
       xs: data.xs,
       res: data.res,
@@ -58,28 +58,47 @@ export async function saveStateToFirestore(data: RawData, actionName?: string, d
       dashboardSnapshots: data.dashboardSnapshots,
       ec0304: data.ec0304,
       gradeEc: data.gradeEc,
+      contagem021101: data.contagem021101,
     });
 
-    const CHUNK_SIZE = 900000; // ~900KB
-    const numChunks = Math.ceil(fullPayload.length / CHUNK_SIZE);
-    
-    // Deleta chunks antigos se houver, de forma simplificada
-    for (let i = 0; i < 10; i++) {
-        try {
-            await setDoc(doc(db, STATE_COLLECTION, `${MAIN_DOC}_part_${i}`), { exists: false });
-        } catch {}
-    }
+    const CHUNK_SIZE = 700000;
+    const numChunks = Math.max(1, Math.ceil(fullPayload.length / CHUNK_SIZE));
 
+    // Salva cada chunk individualmente
+    const savePromises: Promise<any>[] = [];
     for (let i = 0; i < numChunks; i++) {
-        await setDoc(doc(db, STATE_COLLECTION, `${MAIN_DOC}_part_${i}`), {
-            payload: fullPayload.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE),
-            totalChunks: numChunks,
-            updatedAt: serverTimestamp(),
-            updatedAtStr: new Date().toISOString(),
-        });
+      const chunkDocRef = doc(db, STATE_COLLECTION, `${MAIN_DOC}_part_${i}`);
+      savePromises.push(
+        setDoc(chunkDocRef, {
+          payload: fullPayload.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE),
+          index: i,
+          totalChunks: numChunks,
+          updatedAt: serverTimestamp(),
+          updatedAtStr: new Date().toISOString(),
+        })
+      );
+    }
+    await Promise.all(savePromises);
+
+    // Limpa chunks residuais antigos se houver
+    for (let i = numChunks; i < numChunks + 5; i++) {
+      try {
+        const excessDocRef = doc(db, STATE_COLLECTION, `${MAIN_DOC}_part_${i}`);
+        await setDoc(excessDocRef, { payload: '', totalChunks: 0, exists: false });
+      } catch {}
     }
 
-    // Salva o estoque central separado para performance
+    // Atualiza o documento principal com metadados
+    await setDoc(mainDocRef, {
+      totalChunks: numChunks,
+      chunkSize: CHUNK_SIZE,
+      payloadLength: fullPayload.length,
+      updatedAt: serverTimestamp(),
+      updatedAtStr: new Date().toISOString(),
+      version: 2,
+    });
+
+    // Salva o estoque central separado para melhor performance
     if (data.ec) {
       await setDoc(ecDocRef, {
         payload: JSON.stringify(data.ec),
@@ -118,7 +137,7 @@ export async function logActionToFirestore(action: string, details?: string): Pr
 }
 
 /**
- * Carrega o estado salvo do Firestore
+ * Carrega o estado salvo do Firestore com recuperação resiliente
  */
 export async function loadStateFromFirestore(): Promise<RawData | null> {
   try {
@@ -134,27 +153,64 @@ export async function loadStateFromFirestore(): Promise<RawData | null> {
       return null;
     }
 
-    // Carrega os chunks do payload
+    const mainData = mainSnap.data();
+    const totalChunks = mainData?.totalChunks || 1;
+
+    // Busca todos os chunks em paralelo
+    const chunkPromises = [];
+    for (let i = 0; i < totalChunks; i++) {
+      const chunkDocRef = doc(db, STATE_COLLECTION, `${MAIN_DOC}_part_${i}`);
+      chunkPromises.push(getDoc(chunkDocRef));
+    }
+    const chunkSnaps = await Promise.all(chunkPromises);
+
     let fullPayload = '';
-    let i = 0;
-    while (true) {
-        const chunkDocRef = doc(db, STATE_COLLECTION, `${MAIN_DOC}_part_${i}`);
-        const chunkSnap = await getDoc(chunkDocRef);
-        if (!chunkSnap.exists()) break;
-        const chunkData = chunkSnap.data();
-        if (!chunkData.payload) break;
-        fullPayload += chunkData.payload;
-        if (i >= (chunkData.totalChunks || 1) - 1) break;
-        i++;
+    for (const snap of chunkSnaps) {
+      if (snap.exists() && snap.data().payload) {
+        fullPayload += snap.data().payload;
+      }
     }
 
-    const parsedMain = JSON.parse(fullPayload);
+    let parsedMain: any = null;
+
+    if (fullPayload) {
+      try {
+        parsedMain = JSON.parse(fullPayload);
+      } catch (parseErr) {
+        console.warn('Tentativa de reparo de junção no JSON do Firestore...', parseErr);
+        // Tenta auto-reparar qualquer falha de junção de colunas ou linhas
+        try {
+          const repaired = fullPayload.replace(/",01",/g, '"],["01",');
+          parsedMain = JSON.parse(repaired);
+        } catch {
+          // Se ainda falhar, tenta usar payload direto do mainSnap se existir
+          if (mainData.payload) {
+            try {
+              parsedMain = JSON.parse(mainData.payload);
+            } catch {}
+          }
+        }
+      }
+    } else if (mainData.payload) {
+      try {
+        parsedMain = JSON.parse(mainData.payload);
+      } catch {}
+    }
+
+    if (!parsedMain) {
+      console.warn('Nenhum payload de estado válido encontrado no Firestore.');
+      return null;
+    }
 
     let parsedEc: any = undefined;
     if (ecSnap.exists()) {
       const ecDoc = ecSnap.data();
       if (ecDoc.payload) {
-        parsedEc = JSON.parse(ecDoc.payload);
+        try {
+          parsedEc = JSON.parse(ecDoc.payload);
+        } catch (e) {
+          console.warn('Erro ao parsear ecDoc payload:', e);
+        }
       } else if (ecDoc.ec) {
         parsedEc = ecDoc.ec;
       }
@@ -174,6 +230,7 @@ export async function loadStateFromFirestore(): Promise<RawData | null> {
       recontagem020502: parsedMain.recontagem020502,
       desativados: parsedMain.desativados || [],
       dashboardSnapshots: parsedMain.dashboardSnapshots || [],
+      contagem021101: parsedMain.contagem021101 || { counts: [] },
     };
   } catch (error) {
     console.error('Erro ao carregar do Firestore:', error);
