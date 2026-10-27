@@ -110,8 +110,8 @@ export const VariacaoView: React.FC<VariacaoViewProps> = ({
       map.set(p.c, p.R);
     });
     return {
-      name: snap.name,
-      createdAt: snap.createdAt || new Date(snap.timestamp).toLocaleString('pt-BR'),
+      name: snap.label,
+      createdAt: snap.savedAt || new Date(snap.timestamp).toLocaleString('pt-BR'),
       map,
     };
   }, [selectedBase, snapshots, data]);
@@ -917,7 +917,7 @@ export const VariacaoView: React.FC<VariacaoViewProps> = ({
               <option value="congelada">🔒 Dif. Congelada Oficial (data.dia)</option>
               {snapshots.map((snap) => (
                 <option key={snap.id} value={snap.id}>
-                  📁 {snap.name} ({snap.createdAt?.slice(0, 10) || new Date(snap.timestamp).toLocaleDateString('pt-BR')})
+                  📁 {snap.label} ({snap.savedAt?.slice(0, 10) || new Date(snap.timestamp).toLocaleDateString('pt-BR')})
                 </option>
               ))}
             </select>
