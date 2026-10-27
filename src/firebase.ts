@@ -9,7 +9,7 @@ import {
   serverTimestamp,
   onSnapshot,
 } from 'firebase/firestore';
-import { RawData } from './data/types';
+import { RawData, ContagemEstoqueItem } from './data/types';
 
 export const firebaseConfig = {
   apiKey: "AIzaSyCNeRWfV7L-i3X1GBegzETsEbpGkmK_s4g",
@@ -23,9 +23,14 @@ export const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
+// Identificador único da sessão do cliente para evitar loops de eco em tempo real
+export const CLIENT_SESSION_ID =
+  'cli_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now().toString(36);
+
 const STATE_COLLECTION = 'estoque_guarabira';
 const MAIN_DOC = 'estado_atual';
 const EC_DOC = 'estoque_central';
+const CONTAGENS_DOC = 'contagens_estoque';
 const LOGS_COLLECTION = 'historico_acoes';
 
 export interface ActionLog {
@@ -38,11 +43,17 @@ export interface ActionLog {
 
 /**
  * Salva o estado completo no Firestore e registra a ação no histórico
+ * Salva contagens_estoque em documento rápido separado para sincronia instantânea entre usuários
  */
-export async function saveStateToFirestore(data: RawData, actionName?: string, details?: string): Promise<boolean> {
+export async function saveStateToFirestore(
+  data: RawData,
+  actionName?: string,
+  details?: string
+): Promise<boolean> {
   try {
     const mainDocRef = doc(db, STATE_COLLECTION, MAIN_DOC);
     const ecDocRef = doc(db, STATE_COLLECTION, EC_DOC);
+    const contagensDocRef = doc(db, STATE_COLLECTION, CONTAGENS_DOC);
 
     // Salva o estado completo, dividido em partes seguras de ~700KB
     const fullPayload = JSON.stringify({
@@ -58,6 +69,7 @@ export async function saveStateToFirestore(data: RawData, actionName?: string, d
       ec0304: data.ec0304,
       gradeEc: data.gradeEc,
       contagem021101: data.contagem021101,
+      contagensEstoque: data.contagensEstoque || [],
     });
 
     const CHUNK_SIZE = 700000;
@@ -87,13 +99,24 @@ export async function saveStateToFirestore(data: RawData, actionName?: string, d
       } catch {}
     }
 
-    // Atualiza o documento principal com metadados
+    // Salva contagens_estoque em documento leve e direto para broadcast instantâneo (sub-segundo)
+    await setDoc(contagensDocRef, {
+      items: data.contagensEstoque || [],
+      clientSessionId: CLIENT_SESSION_ID,
+      updatedAt: serverTimestamp(),
+      updatedAtStr: new Date().toISOString(),
+      actionName: actionName || 'atualizou_contagens',
+    });
+
+    // Atualiza o documento principal com metadados e clientSessionId
     await setDoc(mainDocRef, {
       totalChunks: numChunks,
       chunkSize: CHUNK_SIZE,
       payloadLength: fullPayload.length,
+      clientSessionId: CLIENT_SESSION_ID,
       updatedAt: serverTimestamp(),
       updatedAtStr: new Date().toISOString(),
+      actionName: actionName || '',
       version: 2,
     });
 
@@ -101,6 +124,7 @@ export async function saveStateToFirestore(data: RawData, actionName?: string, d
     if (data.ec) {
       await setDoc(ecDocRef, {
         payload: JSON.stringify(data.ec),
+        clientSessionId: CLIENT_SESSION_ID,
         updatedAt: serverTimestamp(),
         updatedAtStr: new Date().toISOString(),
       });
@@ -142,10 +166,12 @@ export async function loadStateFromFirestore(): Promise<RawData | null> {
   try {
     const mainDocRef = doc(db, STATE_COLLECTION, MAIN_DOC);
     const ecDocRef = doc(db, STATE_COLLECTION, EC_DOC);
+    const contagensDocRef = doc(db, STATE_COLLECTION, CONTAGENS_DOC);
 
-    const [mainSnap, ecSnap] = await Promise.all([
+    const [mainSnap, ecSnap, contagensSnap] = await Promise.all([
       getDoc(mainDocRef),
       getDoc(ecDocRef),
+      getDoc(contagensDocRef).catch(() => null),
     ]);
 
     if (!mainSnap.exists()) {
@@ -177,12 +203,10 @@ export async function loadStateFromFirestore(): Promise<RawData | null> {
         parsedMain = JSON.parse(fullPayload);
       } catch (parseErr) {
         console.warn('Tentativa de reparo de junção no JSON do Firestore...', parseErr);
-        // Tenta auto-reparar qualquer falha de junção de colunas ou linhas
         try {
           const repaired = fullPayload.replace(/",01",/g, '"],["01",');
           parsedMain = JSON.parse(repaired);
         } catch {
-          // Se ainda falhar, tenta usar payload direto do mainSnap se existir
           if (mainData.payload) {
             try {
               parsedMain = JSON.parse(mainData.payload);
@@ -215,6 +239,15 @@ export async function loadStateFromFirestore(): Promise<RawData | null> {
       }
     }
 
+    // Carrega contagens de estoque (prioriza o documento direto se existir)
+    let parsedContagens: ContagemEstoqueItem[] = parsedMain.contagensEstoque || [];
+    if (contagensSnap && contagensSnap.exists()) {
+      const cData = contagensSnap.data();
+      if (Array.isArray(cData?.items) && cData.items.length > 0) {
+        parsedContagens = cData.items;
+      }
+    }
+
     return {
       xs: parsedMain.xs || [],
       res: parsedMain.res || [],
@@ -229,6 +262,7 @@ export async function loadStateFromFirestore(): Promise<RawData | null> {
       desativados: parsedMain.desativados || [],
       dashboardSnapshots: parsedMain.dashboardSnapshots || [],
       contagem021101: parsedMain.contagem021101 || { counts: [] },
+      contagensEstoque: parsedContagens,
     };
   } catch (error) {
     console.error('Erro ao carregar do Firestore:', error);
@@ -237,14 +271,75 @@ export async function loadStateFromFirestore(): Promise<RawData | null> {
 }
 
 /**
- * Escuta atualizações em tempo real do estado
+ * Escuta atualizações em tempo real do estado (Firestore onSnapshot)
+ * Permite que múltiplos usuários no celular ou PC vejam alterações 100% em tempo real
  */
-export function subscribeToState(callback: (data: RawData) => void): () => void {
+export function subscribeToState(
+  onFullStateUpdate: (data: RawData, actionName?: string) => void,
+  onContagensUpdate?: (items: ContagemEstoqueItem[], actionName?: string) => void
+): () => void {
   const mainDocRef = doc(db, STATE_COLLECTION, MAIN_DOC);
-  return onSnapshot(mainDocRef, (snap) => {
-    if (snap.exists()) {
-      const d = snap.data();
-      // Opcional: dispara quando outro cliente atualizar
+  const contagensDocRef = doc(db, STATE_COLLECTION, CONTAGENS_DOC);
+
+  let isFirstMain = true;
+  let isFirstContagens = true;
+
+  // Escuta o documento principal do estado (tabelas, ajustes, preços, snapshots)
+  const unsubMain = onSnapshot(
+    mainDocRef,
+    async (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+
+      // Ignora o snapshot inicial e escritas feitas pela própria sessão
+      if (isFirstMain) {
+        isFirstMain = false;
+        return;
+      }
+      if (data?.clientSessionId === CLIENT_SESSION_ID) {
+        return;
+      }
+
+      try {
+        const remote = await loadStateFromFirestore();
+        if (remote) {
+          onFullStateUpdate(remote, data?.actionName);
+        }
+      } catch (e) {
+        console.warn('Erro ao atualizar estado remoto via snapshot:', e);
+      }
+    },
+    (error) => {
+      console.error('Erro no listener realtime do Firestore (main):', error);
     }
-  });
+  );
+
+  // Escuta contagens de estoque em tempo real direto (resposta imediata em <500ms)
+  const unsubContagens = onSnapshot(
+    contagensDocRef,
+    (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+
+      if (isFirstContagens) {
+        isFirstContagens = false;
+        return;
+      }
+      if (data?.clientSessionId === CLIENT_SESSION_ID) {
+        return;
+      }
+
+      if (Array.isArray(data?.items) && onContagensUpdate) {
+        onContagensUpdate(data.items, data?.actionName);
+      }
+    },
+    (error) => {
+      console.error('Erro no listener realtime do Firestore (contagens):', error);
+    }
+  );
+
+  return () => {
+    unsubMain();
+    unsubContagens();
+  };
 }

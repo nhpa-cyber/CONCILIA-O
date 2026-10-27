@@ -7,7 +7,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RawData, ResRow, AjustesData, MenRow, DiaRow, DashboardSnapshot } from './data/types';
 import { initialRawData } from './data/defaultRawData';
 import { calculateProducts } from './utils/calc';
-import { saveStateToFirestore, loadStateFromFirestore, logActionToFirestore } from './firebase';
+import { saveStateToFirestore, loadStateFromFirestore, logActionToFirestore, subscribeToState } from './firebase';
 import { process020502 } from './utils/importer020502';
 import { process020304 } from './utils/importer020304';
 import { processTabelaPrecos } from './utils/importerPrecos';
@@ -98,15 +98,48 @@ export default function App() {
     onConfirm: () => {},
   });
 
-  // Carrega do Firestore ao iniciar
+  // Estado de conexão em tempo real com todos os usuários
+  const [isRealtimeActive, setIsRealtimeActive] = useState(false);
+
+  // Carrega do Firestore ao iniciar e escuta alterações em tempo real (100% real-time para todos os usuários)
   useEffect(() => {
+    let isMounted = true;
+
     async function initFirestore() {
       const remote = await loadStateFromFirestore();
-      if (remote) {
+      if (remote && isMounted) {
         setData(remote);
+        setIsRealtimeActive(true);
       }
     }
     initFirestore();
+
+    const unsubscribe = subscribeToState(
+      (remoteData, action) => {
+        if (!isMounted) return;
+        setData(remoteData);
+        setIsRealtimeActive(true);
+        if (action) {
+          setToastMessage(`⚡ Sincronizado em tempo real: ${action}`);
+        }
+      },
+      (contagensItems, action) => {
+        if (!isMounted) return;
+        setData((prev) => ({
+          ...prev,
+          contagensEstoque: consolidateContagens(contagensItems),
+        }));
+        setIsRealtimeActive(true);
+        if (action) {
+          setToastMessage(`⚡ Contagem atualizada por outro usuário (${action})`);
+        }
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   // Salva no LocalStorage sempre que houver alteração
@@ -1160,6 +1193,40 @@ export default function App() {
         >
           TODOS OS PRODUTOS
         </button>
+
+        {/* Indicador de Sincronização em Tempo Real entre Usuários */}
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '11px',
+            fontWeight: '700',
+            padding: '4px 10px',
+            borderRadius: '999px',
+            background: isRealtimeActive ? '#093c1d' : '#451a03',
+            color: isRealtimeActive ? '#4ade80' : '#fde047',
+            border: `1px solid ${isRealtimeActive ? '#16a34a' : '#ca8a04'}`,
+            marginLeft: 'auto',
+          }}
+          title={
+            isRealtimeActive
+              ? 'Conectado em tempo real com todos os usuários via Firebase'
+              : 'Conectando ao banco em tempo real...'
+          }
+        >
+          <span
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: isRealtimeActive ? '#22c55e' : '#eab308',
+              boxShadow: isRealtimeActive ? '0 0 8px #22c55e' : 'none',
+              display: 'inline-block',
+            }}
+          />
+          <span>{isRealtimeActive ? 'TEMPO REAL ATIVO' : 'CONECTANDO...'}</span>
+        </div>
       </nav>
 
       {/* Main Content Area */}
