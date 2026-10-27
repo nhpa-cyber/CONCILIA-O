@@ -2,10 +2,12 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { RawData, CalculatedProduct, DashboardSnapshot } from '../data/types';
 import { N, Rt, RenderMoney } from '../utils/formatters';
 import { calculateProducts, sum } from '../utils/calc';
-import { Columns, Rows, CheckCircle2, Printer, Calendar, Ban, Package, X, Download } from 'lucide-react';
+import { Columns, Rows, CheckCircle2, Printer, Calendar, Ban, Package, X, Download, Camera } from 'lucide-react';
 import { rawDia } from '../data/part2_dia';
 import { CalendarHistoryWidget } from './CalendarHistoryWidget';
 import { SaveDaily020502Modal } from './SaveDaily020502Modal';
+import { PrintTop30Modal } from './PrintTop30Modal';
+import { getMatchedProductsFrom021101, MatchedContagemInfo } from '../utils/contagem021101';
 
 interface DashboardViewProps {
   data: RawData;
@@ -82,13 +84,45 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onDeleteSnapshot,
   onDownloadSnapshot020502,
 }) => {
-  const [statusFilter, setStatusFilter] = useState<'all' | 'verde' | 'laranja' | 'vermelho'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'verde' | 'laranja' | 'vermelho' | 'recontagem_match'>('all');
   const [viewMode, setViewMode] = useState<'side_by_side' | 'stacked' | 'faltas_only' | 'sobras_only'>('side_by_side');
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [selectedSnapshot, setSelectedSnapshot] = useState<DashboardSnapshot | null>(null);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [saveModalInitialDate, setSaveModalInitialDate] = useState<string | undefined>(undefined);
   const [showDevolucaoReminder, setShowDevolucaoReminder] = useState(false);
+
+  // Confirma o lembrete e grava a data de hoje no localStorage para não exibir novamente no mesmo dia
+  const handleConfirmDevolucaoReminder = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+      localStorage.setItem('devolucao_reminder_last_date', today);
+    } catch (e) {
+      console.warn('LocalStorage error:', e);
+    }
+    setShowDevolucaoReminder(false);
+    onOpenImport020502?.();
+  };
+
+  // Ao clicar em IMPORTAR 02.05.02: exibe o lembrete apenas na 1ª vez do dia
+  const handleOpenImportWithReminder = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    let lastDate: string | null = null;
+    try {
+      lastDate = localStorage.getItem('devolucao_reminder_last_date');
+    } catch (e) {
+      console.warn('LocalStorage error:', e);
+    }
+
+    if (lastDate === today) {
+      // Já exibiu e confirmou hoje: abre a importação diretamente sem abrir o popup
+      onOpenImport020502?.();
+    } else {
+      // Primeira vez do dia: abre o popup de lembrete
+      setShowDevolucaoReminder(true);
+    }
+  };
 
   // Fecha o popup com Escape e confirma com Enter
   useEffect(() => {
@@ -97,13 +131,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       if (e.key === 'Escape') {
         setShowDevolucaoReminder(false);
       } else if (e.key === 'Enter') {
-        setShowDevolucaoReminder(false);
-        onOpenImport020502?.();
+        handleConfirmDevolucaoReminder();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showDevolucaoReminder, onOpenImport020502]);
+  }, [showDevolucaoReminder]);
 
   const [selectedItemForAction, setSelectedItemForAction] = useState<{
     code: number;
@@ -524,6 +557,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return { verde, laranja, vermelho };
   }, [f, s]);
 
+  // Mapeamento dos produtos cuja recontagem bateu na rotina 02.11.01 (multi-rodadas)
+  const matched021101Map = useMemo(() => {
+    const counts = data.contagem021101?.counts || [];
+    if (counts.length < 2) return new Map<number, MatchedContagemInfo>();
+    return getMatchedProductsFrom021101(counts);
+  }, [data.contagem021101]);
+
+  // Contagem de itens divergentes no dashboard atual cuja recontagem bateu
+  const matchedInDashboardCount = useMemo(() => {
+    let count = 0;
+    f.forEach(item => {
+      if (matched021101Map.has(item.c)) count++;
+    });
+    s.forEach(item => {
+      if (matched021101Map.has(item.c)) count++;
+    });
+    return count;
+  }, [f, s, matched021101Map]);
+
   // Informações do mês e dias para o Calendário de Consulta Histórica
   const { firstDayOfMonth, totalDaysInMonth, monthName, todayDay } = useMemo(() => {
     const now = new Date();
@@ -548,6 +600,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       if (statusFilter === 'all') {
         list.push(i);
+      } else if (statusFilter === 'recontagem_match') {
+        const matchF = rf && matched021101Map.has(rf.c);
+        const matchS = rs && matched021101Map.has(rs.c);
+        if (matchF || matchS) {
+          list.push(i);
+        }
       } else {
         const matchF = rf?.analysis?.status === statusFilter;
         const matchS = rs?.analysis?.status === statusFilter;
@@ -557,7 +615,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       }
     }
     return list;
-  }, [maxRows, f, s, statusFilter]);
+  }, [maxRows, f, s, statusFilter, matched021101Map]);
 
   // Renderizador de Tabela Individual para Modos Empilhado / Foco
   const renderSingleRankingTable = (isFalta: boolean) => {
@@ -568,6 +626,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
     const filtered = items.filter((item) => {
       if (statusFilter === 'all') return true;
+      if (statusFilter === 'recontagem_match') return matched021101Map.has(item.c);
       return item.analysis?.status === statusFilter;
     });
 
@@ -616,9 +675,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       e.stopPropagation();
                       onRecontar && onRecontar(r.c);
                     }}
-                    title="Dê DUPLO CLIQUE neste código para abrir a Recontagem de Itens"
+                    title={
+                      matched021101Map.has(r.c)
+                        ? `RECONTAGEM 02.11.01 CONFIRMADA:\n• ${matched021101Map.get(r.c)?.statusText}\n• A contagem física coincidiu e a diferença fiscal foi confirmada!\n(Dê duplo clique para abrir recontagem)`
+                        : "Dê DUPLO CLIQUE neste código para abrir a Recontagem de Itens"
+                    }
                   >
-                    {r.c}
+                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                      <span>{r.c}</span>
+                      {matched021101Map.has(r.c) && (
+                        <span
+                          className=""
+                          style={{
+                            padding: '1px 4px',
+                            borderRadius: '3px',
+                            background: '#059669',
+                            color: '#ffffff',
+                            fontSize: '8px',
+                            fontWeight: '900',
+                            boxShadow: 'none',
+                            letterSpacing: '0.2px',
+                          }}
+                        >
+                          CONFIRMADO
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td title={r.d}>{r.d}</td>
                   <td 
@@ -760,6 +842,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span>🔴</span>
             <span>Dif. ≥ 4 cx ({counts.vermelho})</span>
           </button>
+
+          {/* Botão: Recontagem Confirmada (02.11.01) */}
+          {matched021101Map.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setStatusFilter(statusFilter === 'recontagem_match' ? 'all' : 'recontagem_match')}
+              
+              style={{
+                padding: '3px 9px',
+                fontSize: '10.5px',
+                borderRadius: '10px',
+                border: statusFilter === 'recontagem_match' ? '2px solid #047857' : '1.5px solid #10B981',
+                background: statusFilter === 'recontagem_match' ? '#059669' : '#D1FAE5',
+                color: statusFilter === 'recontagem_match' ? '#ffffff' : '#065F46',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                boxShadow: statusFilter === 'recontagem_match' ? '0 0 0 2px rgba(5,150,105,0.3)' : '0 1px 2px rgba(0,0,0,0.05)',
+              }}
+              title="Exibir apenas produtos cuja recontagem bateu com a base (diferença permaneceu confirmada)"
+            >
+              
+              <span>Recontagem Confirmada ({matchedInDashboardCount})</span>
+            </button>
+          )}
         </div>
 
         {/* CONTROLES DE VISUALIZAÇÃO E AUDITORIA */}
@@ -1024,6 +1133,61 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
+      {/* Banner de Recontagem 02.11.01 Confirmada (Bateu c/ a Base / Recontagens) */}
+      {matched021101Map.size > 0 && (
+        <div 
+          style={{ 
+            margin: '6px 16px 0 16px', 
+            padding: '7px 12px', 
+            background: '#ECFDF5', 
+            border: '1.5px solid #10B981', 
+            borderLeft: '5px solid #059669',
+            borderRadius: '5px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            flexWrap: 'wrap', 
+            gap: '8px',
+            boxShadow: '0 1px 3px rgba(5,150,105,0.1)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '16px' }}>✓</span>
+            <div>
+              <div style={{ fontSize: '11.5px', fontWeight: 'bold', color: '#065F46', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>RECONTAGEM 02.11.01: {matched021101Map.size} ITEM(NS) BATERAM (DIFERENÇA PERMANECEU CONFIRMADA)</span>
+                <span style={{ background: '#059669', color: '#ffffff', fontSize: '9px', padding: '1px 5px', borderRadius: '3px', fontWeight: '800' }}>
+                  CONFIRMADO
+                </span>
+              </div>
+              <div style={{ fontSize: '10.5px', color: '#047857' }}>
+                Os itens cuja recontagem coincidiu com a Base (ou recontagem anterior) estão <b>piscando com selo CONFIRMADO</b> no ranking.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStatusFilter(statusFilter === 'recontagem_match' ? 'all' : 'recontagem_match')}
+            
+            style={{
+              padding: '3px 8px',
+              fontSize: '10.5px',
+              borderRadius: '4px',
+              border: 'none',
+              background: '#059669',
+              color: '#ffffff',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <span>{statusFilter === 'recontagem_match' ? '✕ Ver Todos os Itens' : 'Filtrar Itens Confirmados'}</span>
+          </button>
+        </div>
+      )}
+
       {tf === 0 && ts === 0 && (
         <div 
           style={{ 
@@ -1160,9 +1324,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                 e.stopPropagation();
                                 onRecontar && onRecontar(rf.c);
                               }}
-                              title="Dê DUPLO CLIQUE neste código para abrir a Recontagem de Itens"
+                              title={
+                                matched021101Map.has(rf.c)
+                                  ? `RECONTAGEM 02.11.01 CONFIRMADA:\n• ${matched021101Map.get(rf.c)?.statusText}\n• A contagem física coincidiu e a falta foi confirmada!\n(Dê duplo clique para abrir recontagem)`
+                                  : "Dê DUPLO CLIQUE neste código para abrir a Recontagem de Itens"
+                              }
                             >
-                              {rf.c}
+                              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '2.5px' }}>
+                                <span>{rf.c}</span>
+                                {matched021101Map.has(rf.c) && (
+                                  <span
+                                    className=""
+                                    style={{
+                                      padding: '1px 3.5px',
+                                      borderRadius: '3px',
+                                      background: '#059669',
+                                      color: '#ffffff',
+                                      fontSize: '7.5px',
+                                      fontWeight: '900',
+                                      boxShadow: 'none',
+                                      letterSpacing: '0.2px',
+                                    }}
+                                  >
+                                    CONFIRMADO
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td 
                               title={`${rf.d}\nClique para opções do produto (Recontar / Desativar da plataforma por inteiro)`} 
@@ -1277,9 +1464,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                 e.stopPropagation();
                                 onRecontar && onRecontar(rs.c);
                               }}
-                              title="Dê DUPLO CLIQUE neste código para abrir a Recontagem de Itens"
+                              title={
+                                matched021101Map.has(rs.c)
+                                  ? `RECONTAGEM 02.11.01 CONFIRMADA:\n• ${matched021101Map.get(rs.c)?.statusText}\n• A contagem física coincidiu e a sobra foi confirmada!\n(Dê duplo clique para abrir recontagem)`
+                                  : "Dê DUPLO CLIQUE neste código para abrir a Recontagem de Itens"
+                              }
                             >
-                              {rs.c}
+                              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '2.5px' }}>
+                                <span>{rs.c}</span>
+                                {matched021101Map.has(rs.c) && (
+                                  <span
+                                    className=""
+                                    style={{
+                                      padding: '1px 3.5px',
+                                      borderRadius: '3px',
+                                      background: '#059669',
+                                      color: '#ffffff',
+                                      fontSize: '7.5px',
+                                      fontWeight: '900',
+                                      boxShadow: 'none',
+                                      letterSpacing: '0.2px',
+                                    }}
+                                  >
+                                    CONFIRMADO
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td 
                               title={`${rs.d}\nClique para opções do produto (Recontar / Desativar da plataforma por inteiro)`} 
@@ -1454,7 +1664,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 gap: '5px',
                 width: '100%',
               }}
-              onClick={() => setShowDevolucaoReminder(true)}
+              onClick={handleOpenImportWithReminder}
               title="Importar 02.05.02 (Rotina de devolução 02-01-06)"
             >
               <span>📥</span>
@@ -1497,14 +1707,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             LIMPAR DIF
           </button>
 
-          {/* BOTÃO PARA SALVAR A 02.05.02 / FECHAMENTO DO DIA */}
+          {/* BOTÃO PRINT DA TELA (TOP 30 FALTAS & TOP 30 SOBRAS) */}
           <button
             type="button"
             className="btn"
-            onClick={() => {
-              setSaveModalInitialDate(undefined);
-              setIsSaveModalOpen(true);
-            }}
+            onClick={() => setIsPrintModalOpen(true)}
             style={{
               width: '100%',
               padding: '7px 8px',
@@ -1518,13 +1725,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '5px',
+              gap: '6px',
               cursor: 'pointer',
             }}
-            title="Salvar a planilha 02.05.02 atual e o fechamento do dashboard no histórico diário"
+            title="Print da Tela: Visualizar, copiar e baixar imagem com as 30 Faltas e 30 Sobras completas"
           >
-            <span>💾</span>
-            <span>SALVAR 02.05.02 DO DIA</span>
+            <Camera size={14} />
+            <span>PRINT DA TELA</span>
           </button>
 
           <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
@@ -1796,6 +2003,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         }}
       />
 
+      {/* Modal para Print da Tela (Top 30 Faltas & Top 30 Sobras) */}
+      <PrintTop30Modal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        faltas={f}
+        sobras={s}
+        totalFaltas={tf}
+        totalSobras={ts}
+        saldoFinal={sd}
+        colorScaleF={cf}
+        colorScaleS={cs}
+        dateLabel={selectedDay !== null ? `Dia ${selectedDay} de Outubro` : undefined}
+      />
+
       {/* POPUP DE LEMBRETE: ROTINA DE DEVOLUÇÃO 02-01-06 */}
       {showDevolucaoReminder && (
         <div
@@ -1895,47 +2116,49 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </p>
 
               {/* Ações */}
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowDevolucaoReminder(false)}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    border: '1px solid #CBD5E1',
-                    background: '#F1F5F9',
-                    color: '#475569',
-                    fontWeight: 600,
-                    fontSize: '12.5px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowDevolucaoReminder(false);
-                    onOpenImport020502?.();
-                  }}
-                  style={{
-                    padding: '8px 20px',
-                    borderRadius: '6px',
-                    border: '1px solid #D97706',
-                    background: 'linear-gradient(180deg, #F59E0B 0%, #D97706 100%)',
-                    color: '#ffffff',
-                    fontWeight: 'bold',
-                    fontSize: '12.5px',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(217, 119, 6, 0.3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                  }}
-                >
-                  <span>Prosseguir com a Importação</span>
-                  <span>➔</span>
-                </button>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                <span style={{ fontSize: '11px', color: '#64748B', fontStyle: 'italic' }}>
+                  ℹ️ Este lembrete é exibido apenas na 1ª importação do dia.
+                </span>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowDevolucaoReminder(false)}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      border: '1px solid #CBD5E1',
+                      background: '#F1F5F9',
+                      color: '#475569',
+                      fontWeight: 600,
+                      fontSize: '12.5px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmDevolucaoReminder}
+                    style={{
+                      padding: '8px 20px',
+                      borderRadius: '6px',
+                      border: '1px solid #D97706',
+                      background: 'linear-gradient(180deg, #F59E0B 0%, #D97706 100%)',
+                      color: '#ffffff',
+                      fontWeight: 'bold',
+                      fontSize: '12.5px',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(217, 119, 6, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <span>Prosseguir com a Importação</span>
+                    <span>➔</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -2017,6 +2240,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {hoveredItem.analysis.diff === 0 ? 'Estável' : `Divergência: ${hoveredItem.analysis.diff} cx`}
             </span>
           </div>
+
+          {/* Alerta de Recontagem Confirmada / Diferença Permaneceu */}
+          {matched021101Map.has(hoveredItem.code) && (() => {
+            const m = matched021101Map.get(hoveredItem.code)!;
+            return (
+              <div
+                className=""
+                style={{
+                  background: '#ECFDF5',
+                  border: '1.5px solid #10B981',
+                  borderRadius: '6px',
+                  padding: '7px 10px',
+                  marginBottom: '12px',
+                  color: '#065F46',
+                  fontSize: '11px',
+                }}
+              >
+                <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span>RECONTAGEM 02.11.01 CONFIRMADA:</span>
+                </div>
+                <div style={{ marginTop: '2px', lineHeight: '1.3' }}>
+                  • {m.statusText}
+                  <br />
+                  • <b>A diferença fiscal PERMANECEU</b> (físico confirmado em {m.confirmedQty} cx).
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Painel Comparativo Principal (Ontem vs Hoje vs Variação) */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '12px' }}>

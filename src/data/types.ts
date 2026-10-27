@@ -94,21 +94,6 @@ export interface RawData {
   gradeEc?: EstoqueCentralData;
   ec0304?: EstoqueCentralData;
   recontagens?: RecontagemItem[];
-  recontagem020502?: {
-    rawHeaders?: string[];
-    rawRows?: (string | number)[][];
-    delimiter?: string;
-    base: any[];
-    over: Record<string, { 
-      recontagens: { cx: number; src: string }[];
-      p: string;
-      d: string;
-      cx?: number; // Legacy
-      src?: string; // Legacy
-      av?: number; // Legacy
-    }>;
-    hist: { name: string; n: number; snap: Record<string, any> }[];
-  };
   desativados?: number[];
   dashboardSnapshots?: DashboardSnapshot[];
   contagem021101?: {
@@ -128,6 +113,31 @@ export interface RawData {
     }[];
   };
   contagemGps?: ContagemGpsItem[];
+  contagensEstoque?: ContagemEstoqueItem[];
+}
+
+export interface ContagemEstoqueItem {
+  id: string;
+  cod: number;
+  desc: string;
+  tipo: string;
+  fatorCx: number;
+  caixasPorLastro: number;
+  caixasPorPallet: number;
+  pallets: number;
+  lastros: number;
+  caixas: number;
+  unidades: number;
+  totalCaixasFormatado: string;
+  totalCaixasDecimal: number;
+  totalUnidades: number;
+  saldoSistemaCxFormatado?: string;
+  saldoSistemaUnid?: number;
+  divergenciaCx?: number;
+  divergenciaFormatada?: string;
+  dataHora: string;
+  timestamp: number;
+  observacao?: string;
 }
 
 export interface ContagemGpsItem {

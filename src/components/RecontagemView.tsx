@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { CalculatedProduct, RecontagemItem } from '../data/types';
-import { Search, Trash2, ArrowLeft, Printer, FileDown, CheckCircle2, X } from 'lucide-react';
+import { Search, Trash2, ArrowLeft, Printer, FileDown, CheckCircle2, X, AlertTriangle } from 'lucide-react';
 import { generateRecontagemPDF, printDirectSheet } from '../utils/printPdf';
 
 interface RecontagemViewProps {
@@ -17,10 +17,32 @@ interface RecontagemViewProps {
 export const RecontagemView: React.FC<RecontagemViewProps> = ({
   recontagens,
   onDeleteRecontagem,
+  onClearAll,
   onNavigateToDashboard,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showPrintSuccessModal, setShowPrintSuccessModal] = useState(false);
+  const [showConfirmDeleteAllModal, setShowConfirmDeleteAllModal] = useState(false);
+  const [targetItemForDelete, setTargetItemForDelete] = useState<RecontagemItem | null>(null);
+
+  const handleOpenDeleteModal = (item?: RecontagemItem) => {
+    setTargetItemForDelete(item || null);
+    setShowConfirmDeleteAllModal(true);
+  };
+
+  const handleConfirmDeleteAll = () => {
+    onClearAll();
+    setShowConfirmDeleteAllModal(false);
+    setTargetItemForDelete(null);
+  };
+
+  const handleConfirmDeleteSingle = () => {
+    if (targetItemForDelete) {
+      onDeleteRecontagem(targetItemForDelete.id);
+    }
+    setShowConfirmDeleteAllModal(false);
+    setTargetItemForDelete(null);
+  };
 
   const filteredList = useMemo(() => {
     return recontagens.filter((item) => {
@@ -140,6 +162,19 @@ export const RecontagemView: React.FC<RecontagemViewProps> = ({
               <span>BAIXAR PDF</span>
             </button>
           )}
+
+          {/* BOTÃO EXCLUIR TODA A CONTAGEM */}
+          {recontagens.length > 0 && (
+            <button
+              type="button"
+              onClick={() => handleOpenDeleteModal()}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded transition shadow-xs cursor-pointer border border-rose-700"
+              title="Excluir toda a contagem de uma vez"
+            >
+              <Trash2 size={14} />
+              <span>EXCLUIR TODA A CONTAGEM</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -157,8 +192,16 @@ export const RecontagemView: React.FC<RecontagemViewProps> = ({
             />
           </div>
 
-          <div className="text-[11px] text-zinc-500">
-            💡 Clique no ícone de <b>lixeira</b> para excluir caso tenha adicionado algum produto por engano.
+          <div className="text-[11px] text-zinc-600 flex items-center gap-1.5 flex-wrap">
+            <span>💡 Clique no botão</span>
+            <button
+              type="button"
+              onClick={() => handleOpenDeleteModal()}
+              className="font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1 cursor-pointer"
+            >
+              <Trash2 size={11} /> EXCLUIR
+            </button>
+            <span>para excluir toda a contagem de uma vez.</span>
           </div>
         </div>
       </div>
@@ -196,8 +239,16 @@ export const RecontagemView: React.FC<RecontagemViewProps> = ({
                   <th className="p-2.5 text-center">
                     DESCRIÇÃO DO PRODUTO
                   </th>
-                  <th className="p-2.5 w-20 text-center print:hidden border-l border-amber-600/30">
-                    EXCLUIR
+                  <th className="p-2.5 w-24 text-center print:hidden border-l border-amber-600/30">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenDeleteModal()}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-bold shadow-xs transition-colors cursor-pointer"
+                      title="Excluir toda a contagem de uma vez"
+                    >
+                      <Trash2 size={12} />
+                      <span>EXCLUIR</span>
+                    </button>
                   </th>
                 </tr>
               </thead>
@@ -231,16 +282,16 @@ export const RecontagemView: React.FC<RecontagemViewProps> = ({
                         {item.desc}
                       </td>
 
-                      {/* BOTÃO EXCLUIR */}
+                      {/* BOTÃO EXCLUIR (EXCLUI TODA A CONTAGEM DE UMA VEZ) */}
                       <td className="p-2.5 text-center print:hidden border-l border-zinc-100">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            onDeleteRecontagem(item.id);
+                            handleOpenDeleteModal(item);
                           }}
                           className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-100 rounded transition-colors cursor-pointer"
-                          title={`Excluir item ${item.cod} da folha de recontagem`}
+                          title="Excluir toda a contagem de uma vez"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -348,6 +399,83 @@ export const RecontagemView: React.FC<RecontagemViewProps> = ({
                   className="w-full py-1.5 text-zinc-500 hover:text-zinc-800 text-center text-xs font-semibold cursor-pointer"
                 >
                   Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMAÇÃO: EXCLUIR TODA A CONTAGEM */}
+      {showConfirmDeleteAllModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full border-2 border-rose-500 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="bg-rose-600 px-4 py-3 flex items-center justify-between text-white">
+              <div className="flex items-center gap-2 font-bold text-sm">
+                <Trash2 size={18} />
+                <span>EXCLUIR TODA A CONTAGEM</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirmDeleteAllModal(false);
+                  setTargetItemForDelete(null);
+                }}
+                className="text-white hover:bg-white/20 rounded p-1 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-5 text-zinc-800 text-xs space-y-4">
+              <div className="flex items-start gap-3 bg-rose-50 border border-rose-200 text-rose-900 p-3.5 rounded">
+                <AlertTriangle className="text-rose-600 shrink-0 mt-0.5" size={22} />
+                <div>
+                  <p className="font-bold text-sm text-rose-900">
+                    Atenção: Exclusão total da contagem
+                  </p>
+                  <p className="mt-1 text-xs text-rose-800 leading-relaxed">
+                    Deseja excluir toda a contagem? Esta ação removerá{' '}
+                    <b>todos os {recontagens.length} produtos</b> da folha de recontagem de uma vez só.
+                  </p>
+                </div>
+              </div>
+
+              {targetItemForDelete && (
+                <div className="bg-zinc-50 border border-zinc-200 p-2.5 rounded text-[11px] text-zinc-600">
+                  Item selecionado: <span className="font-mono font-bold text-zinc-900">{targetItemForDelete.cod}</span> - {targetItemForDelete.desc}
+                </div>
+              )}
+
+              <div className="pt-2 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteAll}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded shadow-xs transition cursor-pointer text-xs"
+                >
+                  <Trash2 size={15} />
+                  <span>SIM, EXCLUIR TODA A CONTAGEM ({recontagens.length} ITENS)</span>
+                </button>
+
+                {targetItemForDelete && (
+                  <button
+                    type="button"
+                    onClick={handleConfirmDeleteSingle}
+                    className="w-full py-2 px-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold rounded transition cursor-pointer text-[11px] border border-zinc-300"
+                  >
+                    Excluir apenas o item {targetItemForDelete.cod}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowConfirmDeleteAllModal(false);
+                    setTargetItemForDelete(null);
+                  }}
+                  className="w-full py-2 text-zinc-500 hover:text-zinc-800 text-center text-xs font-semibold cursor-pointer"
+                >
+                  Cancelar
                 </button>
               </div>
             </div>

@@ -26,10 +26,10 @@ import { DifMensalView } from './components/DifMensalView';
 import { EstoqueCentralView } from './components/EstoqueCentralView';
 import { DashboardView } from './components/DashboardView';
 import { RecontagemView } from './components/RecontagemView';
-import { Recontagem020502View } from './components/Recontagem020502View';
 import { Contagem021101View } from './components/Contagem021101View';
 import { createRecontagemFromProduct } from './data/defaultRecontagens';
-import { RecontagemItem } from './data/types';
+import { RecontagemItem, ContagemEstoqueItem } from './data/types';
+import { ContagemEstoqueView } from './components/ContagemEstoqueView';
 
 // Modals
 import { Import020502Modal } from './components/Import020502Modal';
@@ -40,8 +40,9 @@ import { SalvarDifModal } from './components/SalvarDifModal';
 import { PasswordModal } from './components/PasswordModal';
 import { EvolucaoDiariaView } from './components/EvolucaoDiariaView';
 import { ProdutosView } from './components/ProdutosView';
+import { VariacaoView } from './components/VariacaoView';
 
-type TabKey = 'dashboard' | 'resumo' | 'ajustes' | 'dif_diaria' | 'dif_mensal' | 'ec' | 'recontagem' | 'recontagem_020502' | 'contagem_021101' | 'produtos';
+type TabKey = 'dashboard' | 'variacao' | 'resumo' | 'ajustes' | 'dif_diaria' | 'dif_mensal' | 'ec' | 'recontagem' | 'contagem_estoque' | 'contagem_021101' | 'produtos';
 
 const STORAGE_KEY = 'estoque_guarabira_state_v5';
 
@@ -257,6 +258,34 @@ export default function App() {
     } catch (e: any) {
       alert(`Falha ao importar: ${e?.message || e}`);
     }
+  };
+
+  // Carrega uma 02.05.02 salva histórica para a plataforma inteira (igualzinho a importar uma nova 02.05.02)
+  const handleLoadSaved020502ToPlatform = (snapshot: DashboardSnapshot) => {
+    if (!snapshot.ec || !snapshot.ec.h || !snapshot.ec.r || snapshot.ec.r.length === 0) {
+      alert('Os dados da 02.05.02 desta data não estão disponíveis ou estão vazios.');
+      return;
+    }
+
+    const delimiter = ';';
+    const formatCell = (val: string | number) => {
+      const s = String(val ?? '');
+      if (s.includes(delimiter) || s.includes('"') || s.includes('\n')) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    };
+
+    const headerLine = snapshot.ec.h.map(formatCell).join(delimiter);
+    const dataLines = snapshot.ec.r.map((row) => row.map(formatCell).join(delimiter));
+    const csvContent = '\ufeff' + [headerLine, ...dataLines].join('\r\n');
+
+    const fileName = snapshot.fileName || `02.05.02_${snapshot.date}.csv`;
+
+    // Importa na plataforma inteira (atualiza Estoque Central, Resumo, Dashboard, etc.) sem duplicar snapshot
+    handleImport020502(csvContent, fileName, 'ec', false);
+
+    setToastMessage(`✓ Relatório 02.05.02 do dia ${snapshot.date.split('-').reverse().join('/')} aplicado em toda a plataforma!`);
   };
 
   // Importação de Tabela de Preços (Tabela 7) via Estoque Central
@@ -854,6 +883,70 @@ export default function App() {
     setToastMessage(`✓ Preço do produto #${code} salvo com sucesso: R$ ${precoCx.toFixed(2).replace('.', ',')}!`);
   };
 
+  const handleSaveContagemEstoque = (item: ContagemEstoqueItem) => {
+    const list = data.contagensEstoque || [];
+    const exists = list.some((c) => c.id === item.id);
+    const updatedList = exists ? list.map((c) => (c.id === item.id ? item : c)) : [item, ...list];
+    const nextData: RawData = {
+      ...data,
+      contagensEstoque: updatedList,
+    };
+    updateDataWithHistory(nextData, `Registrou contagem de estoque do produto #${item.cod} (${item.totalCaixasFormatado} cx)`);
+  };
+
+  const handleUpdateContagemEstoque = (item: ContagemEstoqueItem) => {
+    const list = data.contagensEstoque || [];
+    const updatedList = list.map((c) => (c.id === item.id ? item : c));
+    const nextData: RawData = {
+      ...data,
+      contagensEstoque: updatedList,
+    };
+    updateDataWithHistory(nextData, `Atualizou contagem de estoque do produto #${item.cod}`);
+  };
+
+  const handleDeleteContagemEstoque = (id: string) => {
+    const list = data.contagensEstoque || [];
+    const target = list.find((c) => c.id === id);
+    const updatedList = list.filter((c) => c.id !== id);
+    const nextData: RawData = {
+      ...data,
+      contagensEstoque: updatedList,
+    };
+    updateDataWithHistory(nextData, `Excluiu contagem de estoque ${target ? `#${target.cod}` : ''}`);
+  };
+
+  const handleClearAllContagensEstoque = () => {
+    const nextData: RawData = {
+      ...data,
+      contagensEstoque: [],
+    };
+    updateDataWithHistory(nextData, 'Limpou todas as contagens de estoque');
+  };
+
+  const handleAplicarContagensAoEstoque = (items: ContagemEstoqueItem[]) => {
+    const itemMap = new Map<number, number>();
+    items.forEach((it) => {
+      itemMap.set(it.cod, it.totalUnidades);
+    });
+
+    const newRes = data.res.map((r) => {
+      const row = [...r] as ResRow;
+      if (itemMap.has(row[0])) {
+        row[7] = itemMap.get(row[0])!; // Coluna b (inventário físico em unidades)
+      }
+      return row;
+    });
+
+    const nextData: RawData = {
+      ...data,
+      res: newRes,
+      gradeRes: data.gradeRes ? newRes : undefined,
+    };
+
+    updateDataWithHistory(nextData, `Aplicou contagem física de ${items.length} produtos ao inventário base`);
+    setToastMessage(`✓ ${items.length} contagens físicas aplicadas com sucesso ao inventário do sistema!`);
+  };
+
   return (
     <div className="min-h-screen bg-white text-zinc-900 flex flex-col font-sans w-full max-w-full overflow-x-hidden">
       {/* Top Black Bar */}
@@ -868,6 +961,19 @@ export default function App() {
           onClick={() => setActiveTab('dashboard')}
         >
           DASHBOARD
+        </button>
+
+        <button
+          className={activeTab === 'variacao' ? 'on' : ''}
+          onClick={() => setActiveTab('variacao')}
+          style={
+            activeTab === 'variacao'
+              ? { background: '#090D16', color: '#FFC000', borderColor: '#000' }
+              : { background: '#1E293B', color: '#F8FAFC' }
+          }
+          title="Variação de Faltas e Sobras (Comparativo Hoje vs. Ontem / Base Congelada)"
+        >
+          VARIAÇÃO
         </button>
 
         <button
@@ -935,17 +1041,34 @@ export default function App() {
           )}
         </button>
 
+
+
         <button
-          className={activeTab === 'recontagem_020502' ? 'on' : ''}
-          onClick={() => setActiveTab('recontagem_020502')}
+          className={activeTab === 'contagem_estoque' ? 'on' : ''}
+          onClick={() => setActiveTab('contagem_estoque')}
           style={
-            activeTab === 'recontagem_020502'
-              ? { background: '#0D6B5C', color: '#fff' }
-              : { background: '#115E59', color: '#CCFBF1' }
+            activeTab === 'contagem_estoque'
+              ? { background: '#D97706', color: '#fff' }
+              : { background: '#B45309', color: '#FEF3C7' }
           }
-          title="Recontagem 02.05.02 / 02.11.01 (lógica do HTML de recontagem)"
+          title="Contagem de Estoque por Pallet, Lastro, Caixa e Unidades com Tela do que foi contado"
         >
-          REC 02.05.02
+          CONTAGEM ESTOQUE
+          {(data.contagensEstoque?.length || 0) > 0 && (
+            <span
+              style={{
+                marginLeft: '6px',
+                background: activeTab === 'contagem_estoque' ? '#fff' : '#000',
+                color: activeTab === 'contagem_estoque' ? '#000' : '#FFC000',
+                borderRadius: '999px',
+                padding: '1px 6px',
+                fontSize: '10px',
+                fontWeight: 'bold',
+              }}
+            >
+              {data.contagensEstoque?.length}
+            </span>
+          )}
         </button>
 
         <button
@@ -1015,6 +1138,13 @@ export default function App() {
           <EstoqueCentralView
             ec={data.ec}
             res={data.res}
+            data={data}
+            calculated={calculatedProducts}
+            snapshots={snapshots}
+            onSaveSnapshot={handleSaveSnapshot}
+            onDeleteSnapshot={handleDeleteSnapshot}
+            onDownloadSnapshot020502={downloadSnapshot020502Csv}
+            onLoadSaved020502ToPlatform={handleLoadSaved020502ToPlatform}
             onImport={(txt, nome) => handleImport020502(txt, nome, 'ec')}
             importBannerHtml={ecBannerHtml}
             onClearBanner={() => setEcBannerHtml(null)}
@@ -1058,9 +1188,16 @@ export default function App() {
           />
         )}
 
-
-
-
+        {activeTab === 'variacao' && (
+          <VariacaoView
+            data={data}
+            calculatedProducts={calculatedProducts}
+            calculatedMap={calculatedMap}
+            snapshots={snapshots}
+            onRecontar={handleRecontar}
+            onNavigateToTab={(tab) => setActiveTab(tab as TabKey)}
+          />
+        )}
 
         {activeTab === 'recontagem' && (
           <RecontagemView
@@ -1075,12 +1212,19 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'recontagem_020502' && (
-          <Recontagem020502View
+        {activeTab === 'contagem_estoque' && (
+          <ContagemEstoqueView
             data={data}
-            onUpdateData={(newData, desc) => updateDataWithHistory(newData, desc)}
+            calculatedProducts={calculatedProducts}
+            onSaveContagem={handleSaveContagemEstoque}
+            onUpdateContagem={handleUpdateContagemEstoque}
+            onDeleteContagem={handleDeleteContagemEstoque}
+            onClearAllContagens={handleClearAllContagensEstoque}
+            onAplicarContagensAoEstoque={handleAplicarContagensAoEstoque}
           />
         )}
+
+
 
         {activeTab === 'contagem_021101' && (
           <Contagem021101View

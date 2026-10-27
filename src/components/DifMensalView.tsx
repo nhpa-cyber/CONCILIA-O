@@ -555,43 +555,6 @@ export const DifMensalView: React.FC<DifMensalViewProps> = ({
           <span>Zerar Mês Completo</span>
         </button>
 
-        {/* Alternador de Modo da Coluna Final: DIFERENÇA (padrão) vs SOMA */}
-        <div style={{ display: 'inline-flex', background: '#e2e8f0', padding: '2px', borderRadius: '5px' }}>
-          <button
-            type="button"
-            onClick={() => setSummaryMode('dif')}
-            style={{
-              padding: '4px 10px',
-              fontSize: '11px',
-              fontWeight: 'bold',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              background: summaryMode === 'dif' ? '#FFC000' : 'transparent',
-              color: summaryMode === 'dif' ? '#000' : '#475569',
-            }}
-            title="Exibir a diferença dos dias (padrão solicitado - não soma contagens repetidas)"
-          >
-            ⚡ Diferença (Padrão)
-          </button>
-          <button
-            type="button"
-            onClick={() => setSummaryMode('soma')}
-            style={{
-              padding: '4px 10px',
-              fontSize: '11px',
-              fontWeight: 'bold',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              background: summaryMode === 'soma' ? '#FFC000' : 'transparent',
-              color: summaryMode === 'soma' ? '#000' : '#475569',
-            }}
-            title="Exibir a soma de todos os dias"
-          >
-            ➕ Soma
-          </button>
-        </div>
 
         {/* Alternador de Colunas: Apenas dias lançados vs Todos os 31 dias vs Apenas 14, 15, 19 */}
         <button
