@@ -31,6 +31,7 @@ import { createRecontagemFromProduct } from './data/defaultRecontagens';
 import { RecontagemItem, ContagemEstoqueItem } from './data/types';
 import { ContagemEstoqueView } from './components/ContagemEstoqueView';
 import { ContagemDiaView } from './components/ContagemDiaView';
+import { consolidateContagens, getItemDateString, mergeContagemItems } from './utils/contagemUtils';
 
 // Modals
 import { Import020502Modal } from './components/Import020502Modal';
@@ -886,21 +887,57 @@ export default function App() {
 
   const handleSaveContagemEstoque = (item: ContagemEstoqueItem) => {
     const list = data.contagensEstoque || [];
-    const exists = list.some((c) => c.id === item.id);
-    const updatedList = exists ? list.map((c) => (c.id === item.id ? item : c)) : [item, ...list];
+    const itemDate = getItemDateString(item);
+
+    const existingIndex = list.findIndex(
+      (c) =>
+        c.id === item.id ||
+        (c.cod === item.cod && getItemDateString(c) === itemDate)
+    );
+
+    let updatedList: ContagemEstoqueItem[];
+    let wasMerged = false;
+
+    if (existingIndex >= 0) {
+      const existing = list[existingIndex];
+      if (item.id === existing.id) {
+        // Atualização direta
+        updatedList = list.map((c, i) => (i === existingIndex ? item : c));
+      } else {
+        // Código igual em lançamento novo: SOMA as quantidades
+        const merged = mergeContagemItems(existing, item);
+        updatedList = list.map((c, i) => (i === existingIndex ? merged : c));
+        wasMerged = true;
+      }
+    } else {
+      updatedList = [item, ...list];
+    }
+
+    const consolidated = consolidateContagens(updatedList);
     const nextData: RawData = {
       ...data,
-      contagensEstoque: updatedList,
+      contagensEstoque: consolidated,
     };
-    updateDataWithHistory(nextData, `Registrou contagem de estoque do produto #${item.cod} (${item.totalCaixasFormatado} cx)`);
+    const logText = wasMerged
+      ? `Somou contagem do produto #${item.cod} (${item.desc || ''}): total atualizado para ${item.totalCaixasFormatado} cx`
+      : `Registrou contagem de estoque do produto #${item.cod} (${item.totalCaixasFormatado} cx)`;
+    updateDataWithHistory(nextData, logText);
   };
 
   const handleUpdateContagemEstoque = (item: ContagemEstoqueItem) => {
     const list = data.contagensEstoque || [];
-    const updatedList = list.map((c) => (c.id === item.id ? item : c));
+    const itemDate = getItemDateString(item);
+    // Atualiza o item e limpa eventuais duplicatas anteriores do mesmo código na data
+    const filtered = list.filter(
+      (c) => c.id === item.id || !(c.cod === item.cod && getItemDateString(c) === itemDate)
+    );
+    const updatedList = filtered.map((c) => (c.id === item.id ? item : c));
+    const exists = updatedList.some((c) => c.id === item.id);
+    const finalList = exists ? updatedList : [item, ...updatedList];
+
     const nextData: RawData = {
       ...data,
-      contagensEstoque: updatedList,
+      contagensEstoque: consolidateContagens(finalList),
     };
     updateDataWithHistory(nextData, `Atualizou contagem de estoque do produto #${item.cod}`);
   };
@@ -908,10 +945,15 @@ export default function App() {
   const handleDeleteContagemEstoque = (id: string) => {
     const list = data.contagensEstoque || [];
     const target = list.find((c) => c.id === id);
-    const updatedList = list.filter((c) => c.id !== id);
+    const targetDate = target ? getItemDateString(target) : '';
+    const updatedList = list.filter((c) => {
+      if (c.id === id) return false;
+      if (target && c.cod === target.cod && getItemDateString(c) === targetDate) return false;
+      return true;
+    });
     const nextData: RawData = {
       ...data,
-      contagensEstoque: updatedList,
+      contagensEstoque: consolidateContagens(updatedList),
     };
     updateDataWithHistory(nextData, `Excluiu contagem de estoque ${target ? `#${target.cod}` : ''}`);
   };
@@ -1236,7 +1278,7 @@ export default function App() {
 
         {activeTab === 'contagem_estoque' && (
           <ContagemEstoqueView
-            data={data}
+            data={{ ...data, contagensEstoque: consolidateContagens(data.contagensEstoque || []) }}
             calculatedProducts={calculatedProducts}
             onSaveContagem={handleSaveContagemEstoque}
             onUpdateContagem={handleUpdateContagemEstoque}
@@ -1249,7 +1291,7 @@ export default function App() {
 
         {activeTab === 'contagem_dia' && (
           <ContagemDiaView
-            data={data}
+            data={{ ...data, contagensEstoque: consolidateContagens(data.contagensEstoque || []) }}
             calculatedProducts={calculatedProducts}
             onUpdateContagem={handleUpdateContagemEstoque}
             onDeleteContagem={handleDeleteContagemEstoque}

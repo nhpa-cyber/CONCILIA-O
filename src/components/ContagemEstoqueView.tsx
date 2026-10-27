@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { RawData, ContagemEstoqueItem, CalculatedProduct } from '../data/types';
 import { getProductPalletSpec } from '../utils/palletSpec';
 import { BASE_PALLET_PRODUCTS } from '../data/palletProducts';
+import { getItemDateString } from '../utils/contagemUtils';
 
 const norm = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -348,43 +349,105 @@ export const ContagemEstoqueView: React.FC<ContagemEstoqueViewProps> = ({
       onUpdateContagem(contagemItem);
       setMsg(`✏️ [${cod}] alterado com sucesso!`);
     } else {
-      // Novo lançamento: insere no topo do histórico
-      const newItemId = `cont_${cod}_${now}`;
-      const record: CountRecord = {
-        id: newItemId,
-        c: cod,
-        u,
-        pallets: pQty,
-        lastros: lQty,
-        caixas: cQty,
-        unidades: uQty,
-        dataHora,
-        timestamp: now,
-      };
+      // Novo lançamento: verifica se o item já foi contado hoje para SOMAR as quantidades!
+      const todayStr = new Date().toLocaleDateString('pt-BR');
+      const existingInStore = (data.contagensEstoque || []).find((it) => {
+        if (it.cod !== cod) return false;
+        return getItemDateString(it) === todayStr;
+      });
+      const existingInHistory = historyItems.find((h) => h.c === cod);
 
-      updatedList = [record, ...historyItems.filter((h) => h.c !== cod)];
+      if (existingInStore || existingInHistory) {
+        // Item já existe: soma as quantidades
+        const prevPallets = existingInStore?.pallets ?? existingInHistory?.pallets ?? 0;
+        const prevLastros = existingInStore?.lastros ?? existingInHistory?.lastros ?? 0;
+        const prevCaixas = existingInStore?.caixas ?? existingInHistory?.caixas ?? 0;
+        const prevUnidades = existingInStore?.unidades ?? existingInHistory?.unidades ?? 0;
+        const prevTotalUnits = existingInStore?.totalUnidades ?? existingInHistory?.u ?? 0;
 
-      const contagemItem: ContagemEstoqueItem = {
-        id: newItemId,
-        cod,
-        desc,
-        tipo: 'cx',
-        fatorCx,
-        caixasPorLastro: cxLastro,
-        caixasPorPallet: cxPallet,
-        pallets: pQty,
-        lastros: lQty,
-        caixas: cQty,
-        unidades: uQty,
-        totalCaixasFormatado: formatBoxes(curProduct, u),
-        totalCaixasDecimal: u / (fatorCx || 1),
-        totalUnidades: u,
-        dataHora,
-        timestamp: now,
-      };
+        const sumPallets = prevPallets + pQty;
+        const sumLastros = prevLastros + lQty;
+        const sumCaixas = prevCaixas + cQty;
+        const sumUnidades = prevUnidades + uQty;
+        const sumTotalUnits = prevTotalUnits + u;
+        const sumDecimal = sumTotalUnits / (fatorCx || 1);
+        const sumFormatted = formatBoxes(curProduct, sumTotalUnits);
 
-      onSaveContagem(contagemItem);
-      setMsg(`✅ [${cod}] adicionado com sucesso!`);
+        const targetId = existingInStore?.id || existingInHistory?.id || `cont_${cod}_${now}`;
+
+        const contagemItem: ContagemEstoqueItem = {
+          id: targetId,
+          cod,
+          desc,
+          tipo: 'cx',
+          fatorCx,
+          caixasPorLastro: cxLastro,
+          caixasPorPallet: cxPallet,
+          pallets: sumPallets,
+          lastros: sumLastros,
+          caixas: sumCaixas,
+          unidades: sumUnidades,
+          totalCaixasFormatado: sumFormatted,
+          totalCaixasDecimal: sumDecimal,
+          totalUnidades: sumTotalUnits,
+          dataHora,
+          timestamp: now,
+        };
+
+        const record: CountRecord = {
+          id: targetId,
+          c: cod,
+          u: sumTotalUnits,
+          pallets: sumPallets,
+          lastros: sumLastros,
+          caixas: sumCaixas,
+          unidades: sumUnidades,
+          dataHora,
+          timestamp: now,
+        };
+
+        updatedList = [record, ...historyItems.filter((h) => h.c !== cod)];
+        onSaveContagem(contagemItem);
+        setMsg(`➕ [${cod}] somado à contagem existente! Novo total: ${sumFormatted} (${sumTotalUnits.toLocaleString('pt-BR')} un)`);
+      } else {
+        // Novo item inédito
+        const newItemId = `cont_${cod}_${now}`;
+        const record: CountRecord = {
+          id: newItemId,
+          c: cod,
+          u,
+          pallets: pQty,
+          lastros: lQty,
+          caixas: cQty,
+          unidades: uQty,
+          dataHora,
+          timestamp: now,
+        };
+
+        updatedList = [record, ...historyItems.filter((h) => h.c !== cod)];
+
+        const contagemItem: ContagemEstoqueItem = {
+          id: newItemId,
+          cod,
+          desc,
+          tipo: 'cx',
+          fatorCx,
+          caixasPorLastro: cxLastro,
+          caixasPorPallet: cxPallet,
+          pallets: pQty,
+          lastros: lQty,
+          caixas: cQty,
+          unidades: uQty,
+          totalCaixasFormatado: formatBoxes(curProduct, u),
+          totalCaixasDecimal: u / (fatorCx || 1),
+          totalUnidades: u,
+          dataHora,
+          timestamp: now,
+        };
+
+        onSaveContagem(contagemItem);
+        setMsg(`✅ [${cod}] adicionado com sucesso! (${formatBoxes(curProduct, u)})`);
+      }
     }
 
     persistItems(updatedList);

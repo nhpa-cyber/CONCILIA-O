@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { RawData, ContagemEstoqueItem, CalculatedProduct } from '../data/types';
+import { consolidateContagens, getItemDateString } from '../utils/contagemUtils';
 import { 
   Calendar, 
   Search, 
@@ -35,7 +36,10 @@ export const ContagemDiaView: React.FC<ContagemDiaViewProps> = ({
   onAplicarContagensAoEstoque,
   onNavigateToContagem,
 }) => {
-  const allContagens = useMemo(() => data.contagensEstoque || [], [data.contagensEstoque]);
+  const allContagens = useMemo(
+    () => consolidateContagens(data.contagensEstoque || []),
+    [data.contagensEstoque]
+  );
 
   // Extrair datas disponíveis de todas as contagens
   const availableDates = useMemo(() => {
@@ -44,12 +48,8 @@ export const ContagemDiaView: React.FC<ContagemDiaViewProps> = ({
     dates.add(today);
 
     allContagens.forEach((it) => {
-      if (it.timestamp) {
-        dates.add(new Date(it.timestamp).toLocaleDateString('pt-BR'));
-      } else if (it.dataHora) {
-        const parts = it.dataHora.split(/[\s,]+/);
-        if (parts[0]) dates.add(parts[0]);
-      }
+      const d = getItemDateString(it);
+      if (d) dates.add(d);
     });
 
     return Array.from(dates).sort((a, b) => {
@@ -81,18 +81,13 @@ export const ContagemDiaView: React.FC<ContagemDiaViewProps> = ({
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Filtrar contagens da data selecionada
+  // Filtrar contagens da data selecionada (e consolida/soma itens idênticos)
   const contagensDoDia = useMemo(() => {
-    return allContagens.filter((it) => {
-      let itemDate = '';
-      if (it.timestamp) {
-        itemDate = new Date(it.timestamp).toLocaleDateString('pt-BR');
-      } else if (it.dataHora) {
-        const parts = it.dataHora.split(/[\s,]+/);
-        itemDate = parts[0] || '';
-      }
+    const list = allContagens.filter((it) => {
+      const itemDate = getItemDateString(it);
       return itemDate === selectedDate;
     });
+    return consolidateContagens(list);
   }, [allContagens, selectedDate]);
 
   // Filtrar com base na pesquisa
