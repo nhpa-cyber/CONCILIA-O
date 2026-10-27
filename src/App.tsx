@@ -30,6 +30,7 @@ import { Contagem021101View } from './components/Contagem021101View';
 import { createRecontagemFromProduct } from './data/defaultRecontagens';
 import { RecontagemItem, ContagemEstoqueItem } from './data/types';
 import { ContagemEstoqueView } from './components/ContagemEstoqueView';
+import { ContagemDiaView } from './components/ContagemDiaView';
 
 // Modals
 import { Import020502Modal } from './components/Import020502Modal';
@@ -42,7 +43,7 @@ import { EvolucaoDiariaView } from './components/EvolucaoDiariaView';
 import { ProdutosView } from './components/ProdutosView';
 import { VariacaoView } from './components/VariacaoView';
 
-type TabKey = 'dashboard' | 'variacao' | 'resumo' | 'ajustes' | 'dif_diaria' | 'dif_mensal' | 'ec' | 'recontagem' | 'contagem_estoque' | 'contagem_021101' | 'produtos';
+type TabKey = 'dashboard' | 'variacao' | 'resumo' | 'ajustes' | 'dif_diaria' | 'dif_mensal' | 'ec' | 'recontagem' | 'contagem_estoque' | 'contagem_dia' | 'contagem_021101' | 'produtos';
 
 const STORAGE_KEY = 'estoque_guarabira_state_v5';
 
@@ -1051,24 +1052,45 @@ export default function App() {
               ? { background: '#D97706', color: '#fff' }
               : { background: '#B45309', color: '#FEF3C7' }
           }
-          title="Contagem de Estoque por Pallet, Lastro, Caixa e Unidades com Tela do que foi contado"
+          title="Contagem de Estoque: Lançamento rápido por Pallet, Lastro, Caixa e Unidades"
         >
           CONTAGEM ESTOQUE
-          {(data.contagensEstoque?.length || 0) > 0 && (
-            <span
-              style={{
-                marginLeft: '6px',
-                background: activeTab === 'contagem_estoque' ? '#fff' : '#000',
-                color: activeTab === 'contagem_estoque' ? '#000' : '#FFC000',
-                borderRadius: '999px',
-                padding: '1px 6px',
-                fontSize: '10px',
-                fontWeight: 'bold',
-              }}
-            >
-              {data.contagensEstoque?.length}
-            </span>
-          )}
+        </button>
+
+        <button
+          className={activeTab === 'contagem_dia' ? 'on' : ''}
+          onClick={() => setActiveTab('contagem_dia')}
+          style={
+            activeTab === 'contagem_dia'
+              ? { background: '#0284C7', color: '#fff' }
+              : { background: '#0369A1', color: '#E0F2FE' }
+          }
+          title="Contagem do Dia: Relatório consolidado com o que os conferentes contaram no dia"
+        >
+          CONTAGEM DO DIA
+          {(() => {
+            const today = new Date().toLocaleDateString('pt-BR');
+            const todayCount = (data.contagensEstoque || []).filter((it) => {
+              if (it.timestamp) return new Date(it.timestamp).toLocaleDateString('pt-BR') === today;
+              if (it.dataHora) return it.dataHora.includes(today);
+              return false;
+            }).length;
+            return todayCount > 0 ? (
+              <span
+                style={{
+                  marginLeft: '6px',
+                  background: activeTab === 'contagem_dia' ? '#fff' : '#000',
+                  color: activeTab === 'contagem_dia' ? '#000' : '#38BDF8',
+                  borderRadius: '999px',
+                  padding: '1px 6px',
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                }}
+              >
+                {todayCount}
+              </span>
+            ) : null;
+          })()}
         </button>
 
         <button
@@ -1221,6 +1243,18 @@ export default function App() {
             onDeleteContagem={handleDeleteContagemEstoque}
             onClearAllContagens={handleClearAllContagensEstoque}
             onAplicarContagensAoEstoque={handleAplicarContagensAoEstoque}
+            onNavigateToContagemDia={() => setActiveTab('contagem_dia')}
+          />
+        )}
+
+        {activeTab === 'contagem_dia' && (
+          <ContagemDiaView
+            data={data}
+            calculatedProducts={calculatedProducts}
+            onUpdateContagem={handleUpdateContagemEstoque}
+            onDeleteContagem={handleDeleteContagemEstoque}
+            onAplicarContagensAoEstoque={handleAplicarContagensAoEstoque}
+            onNavigateToContagem={() => setActiveTab('contagem_estoque')}
           />
         )}
 
