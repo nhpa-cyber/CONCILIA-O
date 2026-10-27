@@ -672,52 +672,94 @@ export const ContagemEstoqueView: React.FC<ContagemEstoqueViewProps> = ({
 
         .cnt-grid {
           display: grid;
-          grid-template-columns: 1fr;
-          gap: 10px;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 6px;
+        }
+
+        .cnt-grid > div {
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
         }
 
         .cnt-grid input {
+          width: 100%;
           text-align: center;
-          font-size: 20px;
-          font-weight: 700;
-          padding: 12px 4px;
+          font-size: 19px;
+          font-weight: 800;
+          padding: 10px 2px;
+          border-radius: 8px;
+          border: 1.5px solid var(--bd);
+          background: #fff;
+          color: #0f172a;
+          box-sizing: border-box;
+          -webkit-appearance: none;
+        }
+
+        .cnt-grid input:focus {
+          outline: none;
+          border-color: #0b5fd6;
+          box-shadow: 0 0 0 3px rgba(11, 95, 214, 0.2);
+          background: #eff6ff;
+        }
+
+        .cnt-grid input:disabled {
+          background: #f1f5f9;
+          border-color: #e2e8f0;
+          color: #94a3b8;
+          opacity: 0.6;
+          cursor: not-allowed;
         }
 
         .cnt-grid label {
           text-align: center;
+          font-size: 11px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.4px;
+          color: var(--tx);
+          margin-bottom: 4px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .cnt-res {
-          margin-top: 12px;
-          padding: 12px;
+          margin-top: 10px;
+          padding: 8px 12px;
           border-radius: 8px;
-          background: var(--bg);
+          background: #f8fafc;
           border: 1px dashed var(--bd);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 4px;
         }
 
         .cnt-big {
-          font-size: 22px;
-          font-weight: 700;
+          font-size: 20px;
+          font-weight: 800;
           color: var(--ok);
         }
 
         .cnt-sm {
-          font-size: 13px;
+          font-size: 12px;
           color: var(--mu);
-          margin-top: 2px;
+          font-weight: 600;
         }
 
         .cnt-btns {
-          display: flex;
+          display: grid;
+          grid-template-columns: 2fr 1fr;
           gap: 8px;
-          margin-top: 12px;
-          flex-wrap: wrap;
+          margin-top: 10px;
         }
 
         .cnt-btn {
           font: inherit;
           font-weight: 600;
-          padding: 11px 16px;
+          padding: 10px 14px;
           border-radius: 8px;
           border: 1px solid var(--bd);
           background: var(--card);
@@ -763,6 +805,79 @@ export const ContagemEstoqueView: React.FC<ContagemEstoqueViewProps> = ({
           color: var(--ac);
           margin-top: 8px;
           font-weight: 600;
+        }
+
+        @media (max-width: 640px) {
+          .cnt-main {
+            padding: 8px 10px;
+          }
+
+          .cnt-header {
+            margin: 0 0 8px;
+          }
+
+          .cnt-header h1 {
+            font-size: 17px;
+          }
+
+          .cnt-card {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+          }
+
+          .cnt-prod {
+            margin-top: 8px;
+          }
+
+          .cnt-prod h2 {
+            font-size: 14px;
+            line-height: 1.3;
+            margin: 0 0 2px;
+          }
+
+          .cnt-info {
+            font-size: 11px;
+            margin-bottom: 8px;
+          }
+
+          .cnt-grid {
+            gap: 4px;
+          }
+
+          .cnt-grid input {
+            font-size: 18px;
+            padding: 8px 2px;
+            height: 42px;
+          }
+
+          .cnt-grid label {
+            font-size: 10px;
+            margin-bottom: 2px;
+          }
+
+          .cnt-res {
+            margin-top: 8px;
+            padding: 6px 10px;
+          }
+
+          .cnt-big {
+            font-size: 17px;
+          }
+
+          .cnt-sm {
+            font-size: 11px;
+          }
+
+          .cnt-btns {
+            margin-top: 8px;
+            gap: 6px;
+          }
+
+          .cnt-btn {
+            padding: 9px 8px;
+            font-size: 13px;
+          }
         }
 
         /* Seção do Último Código Adicionado */
@@ -909,7 +1024,7 @@ export const ContagemEstoqueView: React.FC<ContagemEstoqueViewProps> = ({
                 {curProduct[4]} un/cx
               </div>
 
-              {/* Grid vertical dos 4 campos */}
+              {/* Grid horizontal dos 4 campos: Pallet, Lastro, Caixa e Unidades */}
               <div className="cnt-grid">
                 <div>
                   <label className="cnt-label" htmlFor="n0">
@@ -922,15 +1037,17 @@ export const ContagemEstoqueView: React.FC<ContagemEstoqueViewProps> = ({
                     type="number"
                     min="0"
                     inputMode="numeric"
+                    enterKeyHint="next"
                     placeholder="0"
                     value={n0}
                     onChange={(e) => setN0(e.target.value)}
                     onKeyDown={(e) => handleInputKeyDown(e, 0)}
+                    onFocus={(e) => e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}
                   />
                 </div>
 
                 <div>
-                  <label className="cnt-label" htmlFor="n1">
+                  <label className="cnt-label" htmlFor="n1" style={{ opacity: curProduct[3] ? 1 : 0.6 }}>
                     Lastro
                   </label>
                   <input
@@ -940,11 +1057,13 @@ export const ContagemEstoqueView: React.FC<ContagemEstoqueViewProps> = ({
                     type="number"
                     min="0"
                     inputMode="numeric"
-                    placeholder="0"
+                    enterKeyHint="next"
+                    placeholder={curProduct[3] ? '0' : '—'}
                     disabled={!curProduct[3]}
                     value={n1}
                     onChange={(e) => setN1(e.target.value)}
                     onKeyDown={(e) => handleInputKeyDown(e, 1)}
+                    onFocus={(e) => e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}
                   />
                 </div>
 
@@ -959,16 +1078,18 @@ export const ContagemEstoqueView: React.FC<ContagemEstoqueViewProps> = ({
                     type="number"
                     min="0"
                     inputMode="numeric"
+                    enterKeyHint="next"
                     placeholder="0"
                     value={n2}
                     onChange={(e) => setN2(e.target.value)}
                     onKeyDown={(e) => handleInputKeyDown(e, 2)}
+                    onFocus={(e) => e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}
                   />
                 </div>
 
                 <div>
                   <label className="cnt-label" htmlFor="n3">
-                    Unidade
+                    Unidades
                   </label>
                   <input
                     id="n3"
@@ -977,24 +1098,23 @@ export const ContagemEstoqueView: React.FC<ContagemEstoqueViewProps> = ({
                     type="number"
                     min="0"
                     inputMode="numeric"
+                    enterKeyHint="done"
                     placeholder="0"
                     value={n3}
                     onChange={(e) => setN3(e.target.value)}
                     onKeyDown={(e) => handleInputKeyDown(e, 3)}
+                    onFocus={(e) => e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}
                   />
                 </div>
               </div>
 
-              {/* Resumo do cálculo atual */}
+              {/* Resumo do cálculo atual compacto */}
               <div className="cnt-res">
                 <div className="cnt-big" id="r1">
                   {formatBoxes(curProduct, totalCalculatedUnits)}
                 </div>
                 <div className="cnt-sm" id="r2">
-                  Total: {totalCalculatedUnits} unidades
-                </div>
-                <div className="cnt-sm" id="r3">
-                  {formatBreakdown(curProduct, totalCalculatedUnits)}
+                  Total: {totalCalculatedUnits.toLocaleString('pt-BR')} un
                 </div>
               </div>
 
