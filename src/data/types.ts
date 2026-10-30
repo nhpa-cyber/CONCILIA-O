@@ -83,6 +83,40 @@ export interface DashboardSnapshot {
   savedAt: string;
 }
 
+export interface SavedPopupItem {
+  id: string;
+  code: number;
+  desc: string;
+  isFalta: boolean;
+  qtde: number;
+  valor: number;
+  peso: number;
+  unitPrice?: number;
+  variacaoCx?: number;
+  impactoVariacao?: number;
+  savedAt: string;
+  analysis: {
+    status: 'verde' | 'laranja' | 'vermelho';
+    diff: number;
+    hoje: number;
+    ontem: number;
+    label: string;
+    bg: string;
+    color: string;
+  };
+  last5Days: {
+    days: { day: number; isToday: boolean; label: string; qty: number }[];
+    periodDiff: number;
+    avg: number;
+    startDay: number;
+    endDay: number;
+  };
+  matched021101?: {
+    statusText: string;
+    confirmedQty: number | null;
+  } | null;
+}
+
 export interface RawData {
   xs: number[];
   res: ResRow[];
@@ -114,6 +148,7 @@ export interface RawData {
   };
   contagemGps?: ContagemGpsItem[];
   contagensEstoque?: ContagemEstoqueItem[];
+  recontagem020502?: any;
 }
 
 export interface ContagemEstoqueItem {

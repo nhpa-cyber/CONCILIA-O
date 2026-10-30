@@ -10,7 +10,15 @@ interface ResumoViewProps {
   t7BannerHtml: string | null;
   ecBannerHtml?: string | null;
   onRecontar?: (code: number) => void;
+  onNavigateToDashboard?: () => void;
 }
+
+const format2Dec = (val: number): string => {
+  return new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(val);
+};
 
 export const ResumoView: React.FC<ResumoViewProps> = ({
   calculated,
@@ -19,6 +27,7 @@ export const ResumoView: React.FC<ResumoViewProps> = ({
   t7BannerHtml,
   ecBannerHtml,
   onRecontar,
+  onNavigateToDashboard,
 }) => {
   const [query, setQuery] = useState('');
   const [activeEditCell, setActiveEditCell] = useState<{ index: number; key: 'G' | 'J' } | null>(null);
@@ -55,7 +64,10 @@ export const ResumoView: React.FC<ResumoViewProps> = ({
     const fa = active.filter((r) => r.R < 0).length;
     const ok = active.filter((r) => r.R === 0).length;
     const totalCount = so + fa + ok || 1;
-    const toolkit = N((ok / totalCount) * 100, 0);
+    const toolkit = ((ok / totalCount) * 100).toLocaleString('pt-BR', {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    }) + '%';
 
     return {
       date: new Date().toLocaleDateString('pt-BR'),
@@ -86,46 +98,413 @@ export const ResumoView: React.FC<ResumoViewProps> = ({
 
   return (
     <section>
-      <div className="kpis">
-        <div className="k">
-          <small>DATA</small>
-          <span>{kpis.date}</span>
+      {/* =====================================================================
+          CABEÇALHO OFICIAL DO RESUMO (IDÊNTICO À FOTO FORNECIDA PELO USUÁRIO)
+      ===================================================================== */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          margin: '10px 0 16px',
+          overflowX: 'auto',
+          paddingBottom: '4px',
+          fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        }}
+      >
+        {/* BLOCO 1: DATA, DIF EM REAIS, DIF EM HECTO */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '170px 280px',
+            gridTemplateRows: 'repeat(3, 33px)',
+            border: '2px solid #FFFFFF',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+            flexShrink: 0,
+          }}
+        >
+          {/* Linha 1: DATA */}
+          <div
+            style={{
+              background: '#3A3A3A',
+              color: '#FFFFFF',
+              fontWeight: 800,
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRight: '2px solid #FFFFFF',
+              borderBottom: '2px solid #FFFFFF',
+              letterSpacing: '0.4px',
+            }}
+          >
+            DATA
+          </div>
+          <div
+            style={{
+              background: '#3A3A3A',
+              color: '#FFFFFF',
+              fontWeight: 800,
+              fontSize: '23px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderBottom: '2px solid #FFFFFF',
+              letterSpacing: '0.5px',
+            }}
+          >
+            {kpis.date}
+          </div>
+
+          {/* Linha 2: DIF EM REAIS */}
+          <div
+            style={{
+              background: '#3A3A3A',
+              color: '#FFFFFF',
+              fontWeight: 800,
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRight: '2px solid #FFFFFF',
+              borderBottom: '2px solid #FFFFFF',
+              letterSpacing: '0.3px',
+            }}
+          >
+            DIF EM REAIS
+          </div>
+          <div
+            style={{
+              background: kpis.dif < 0 ? '#FFD6D9' : '#D4EDDA',
+              color: kpis.dif < 0 ? '#B91C1C' : '#15803D',
+              fontWeight: 800,
+              fontSize: '14.5px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0 14px',
+              borderBottom: '2px solid #FFFFFF',
+              fontFamily: 'monospace',
+            }}
+          >
+            <span>{kpis.dif < 0 ? '-R$' : 'R$'}</span>
+            <span>{format2Dec(Math.abs(kpis.dif))}</span>
+          </div>
+
+          {/* Linha 3: DIF EM HECTO */}
+          <div
+            style={{
+              background: '#3A3A3A',
+              color: '#FFFFFF',
+              fontWeight: 800,
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRight: '2px solid #FFFFFF',
+              letterSpacing: '0.3px',
+            }}
+          >
+            DIF EM HECTO
+          </div>
+          <div
+            style={{
+              background: kpis.difHecto >= 0 ? '#D4EDDA' : '#FFD6D9',
+              color: kpis.difHecto >= 0 ? '#15803D' : '#B91C1C',
+              fontWeight: 800,
+              fontSize: '14.5px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontFamily: 'monospace',
+            }}
+          >
+            <span>{format2Dec(kpis.difHecto)}</span>
+          </div>
         </div>
-        <div className={`k ${kpis.dif < 0 ? 'r' : 'g'}`}>
-          <small>DIF EM REAIS</small>
-          <span>{Rt(kpis.dif)}</span>
+
+        {/* BLOCO 2: FISCAL E FÍSICO */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '135px 125px',
+            gridTemplateRows: 'repeat(4, 25px)',
+            border: '1px solid #1E293B',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+            flexShrink: 0,
+          }}
+        >
+          {/* Cabeçalho 1 */}
+          <div
+            style={{
+              background: '#3A3A3A',
+              color: '#FFFFFF',
+              fontWeight: 800,
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRight: '1px solid #1E293B',
+              borderBottom: '1px solid #1E293B',
+            }}
+          >
+            2
+          </div>
+          <div
+            style={{
+              background: '#3A3A3A',
+              color: '#FFFFFF',
+              fontWeight: 800,
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderBottom: '1px solid #1E293B',
+            }}
+          >
+            HECTO FISCAL
+          </div>
+
+          {/* Valores 1 */}
+          <div
+            style={{
+              background: '#F1F5F9',
+              color: '#0F172A',
+              fontWeight: 800,
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0 8px',
+              borderRight: '1px solid #1E293B',
+              borderBottom: '1px solid #1E293B',
+              fontFamily: 'monospace',
+            }}
+          >
+            <span style={{ fontSize: '10.5px' }}>R$</span>
+            <span>{format2Dec(kpis.estFiscal)}</span>
+          </div>
+          <div
+            style={{
+              background: '#F1F5F9',
+              color: '#0F172A',
+              fontWeight: 800,
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderBottom: '1px solid #1E293B',
+              fontFamily: 'monospace',
+            }}
+          >
+            {format2Dec(kpis.hf)}
+          </div>
+
+          {/* Cabeçalho 2 */}
+          <div
+            style={{
+              background: '#3A3A3A',
+              color: '#FFFFFF',
+              fontWeight: 800,
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRight: '1px solid #1E293B',
+              borderBottom: '1px solid #1E293B',
+            }}
+          >
+            ESTOQUE FÍSICO
+          </div>
+          <div
+            style={{
+              background: '#3A3A3A',
+              color: '#FFFFFF',
+              fontWeight: 800,
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderBottom: '1px solid #1E293B',
+            }}
+          >
+            HECTO FÍSICO
+          </div>
+
+          {/* Valores 2 */}
+          <div
+            style={{
+              background: '#F1F5F9',
+              color: '#0F172A',
+              fontWeight: 800,
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0 8px',
+              borderRight: '1px solid #1E293B',
+              fontFamily: 'monospace',
+            }}
+          >
+            <span style={{ fontSize: '10.5px' }}>R$</span>
+            <span>{format2Dec(kpis.estFisico)}</span>
+          </div>
+          <div
+            style={{
+              background: '#F1F5F9',
+              color: '#0F172A',
+              fontWeight: 800,
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontFamily: 'monospace',
+            }}
+          >
+            {format2Dec(kpis.hp)}
+          </div>
         </div>
-        <div className="k">
-          <small>DIF EM HECTO</small>
-          <span>{N(kpis.difHecto)}</span>
-        </div>
-        <div className="k">
-          <small>ESTOQUE FISCAL</small>
-          <span>{Rt(kpis.estFiscal)}</span>
-        </div>
-        <div className="k">
-          <small>ESTOQUE FÍSICO</small>
-          <span>{Rt(kpis.estFisico)}</span>
-        </div>
-        <div className="k">
-          <small>HECTO FISCAL / FÍSICO</small>
-          <span>{N(kpis.hf)} / {N(kpis.hp)}</span>
-        </div>
-        <div className="k g">
-          <small>SOBRAS</small>
-          <span>{kpis.so}</span>
-        </div>
-        <div className="k r">
-          <small>FALTAS</small>
-          <span>{kpis.fa}</span>
-        </div>
-        <div className="k">
-          <small>OK</small>
-          <span>{kpis.ok}</span>
-        </div>
-        <div className="k">
-          <small>TOOLKIT</small>
-          <span>{kpis.toolkit}%</span>
+
+        {/* BLOCO: TOOLKIT + SOBRAS / FALTAS / OK */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 85px)',
+            gridTemplateRows: 'repeat(4, 25px)',
+            border: '1px solid #1E293B',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+            flexShrink: 0,
+          }}
+        >
+          {/* Linha 1 do Topo: TOOLKIT */}
+          <div style={{ background: '#FFFFFF', borderRight: '1px solid #1E293B', borderBottom: '1px solid #1E293B' }} />
+          <div
+            style={{
+              background: '#3A3A3A',
+              color: '#FFFFFF',
+              fontWeight: 800,
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRight: '1px solid #1E293B',
+              borderBottom: '1px solid #1E293B',
+            }}
+          >
+            TOOLKIT
+          </div>
+          <div style={{ background: '#FFFFFF', borderBottom: '1px solid #1E293B' }} />
+
+          {/* Linha 2: Valor do TOOLKIT */}
+          <div style={{ background: '#FFFFFF', borderRight: '1px solid #1E293B', borderBottom: '1px solid #1E293B' }} />
+          <div
+            style={{
+              background: '#FFD6D9',
+              color: '#B91C1C',
+              fontWeight: 800,
+              fontSize: '15px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRight: '1px solid #1E293B',
+              borderBottom: '1px solid #1E293B',
+            }}
+          >
+            {kpis.toolkit}
+          </div>
+          <div style={{ background: '#FFFFFF', borderBottom: '1px solid #1E293B' }} />
+
+          {/* Linha 3: Cabeçalhos SOBRAS | FALTAS | OK */}
+          <div
+            style={{
+              background: '#3A3A3A',
+              color: '#FFFFFF',
+              fontWeight: 800,
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRight: '1px solid #1E293B',
+              borderBottom: '1px solid #1E293B',
+            }}
+          >
+            SOBRAS
+          </div>
+          <div
+            style={{
+              background: '#3A3A3A',
+              color: '#FFFFFF',
+              fontWeight: 800,
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRight: '1px solid #1E293B',
+              borderBottom: '1px solid #1E293B',
+            }}
+          >
+            FALTAS
+          </div>
+          <div
+            style={{
+              background: '#3A3A3A',
+              color: '#FFFFFF',
+              fontWeight: 800,
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderBottom: '1px solid #1E293B',
+            }}
+          >
+            OK
+          </div>
+
+          {/* Linha 4: Valores SOBRAS | FALTAS | OK */}
+          <div
+            style={{
+              background: '#FFFFFF',
+              color: '#000000',
+              fontWeight: 800,
+              fontSize: '15px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRight: '1px solid #1E293B',
+              fontFamily: 'monospace',
+            }}
+          >
+            {kpis.so}
+          </div>
+          <div
+            style={{
+              background: '#FFFFFF',
+              color: '#000000',
+              fontWeight: 800,
+              fontSize: '15px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRight: '1px solid #1E293B',
+              fontFamily: 'monospace',
+            }}
+          >
+            {kpis.fa}
+          </div>
+          <div
+            style={{
+              background: '#FFFFFF',
+              color: '#000000',
+              fontWeight: 800,
+              fontSize: '15px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontFamily: 'monospace',
+            }}
+          >
+            {kpis.ok}
+          </div>
         </div>
       </div>
 

@@ -33,7 +33,15 @@ export function calculateProducts(data: RawData): CalcResult {
 
   const desativadosSet = new Set(data.desativados || []);
 
-  const C: CalculatedProduct[] = data.res.map((x) => {
+  const validRes = data.res.filter((x) => {
+    const desc = String(x[1] || '').trim();
+    if (!desc || desc === '' || desc === '01' || /^\d+$/.test(desc)) {
+      return false;
+    }
+    return true;
+  });
+
+  const C: CalculatedProduct[] = validRes.map((x) => {
     const [c, d, t, G, V0, U, X, b, P, rm, rn, ro] = x;
     const isDesativado = desativadosSet.has(c);
     const V = V0 || 1;

@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { RawData, CalculatedProduct, DashboardSnapshot } from '../data/types';
+import { RawData, CalculatedProduct, DashboardSnapshot, SavedPopupItem } from '../data/types';
 import { N, Rt, RenderMoney } from '../utils/formatters';
 import { calculateProducts, sum } from '../utils/calc';
 import { Columns, Rows, CheckCircle2, Printer, Calendar, Ban, Package, X, Download, Camera } from 'lucide-react';
@@ -21,6 +21,7 @@ interface DashboardViewProps {
   onRecontar?: (code: number) => void;
   onToggleDesativar?: (code: number) => void;
   onNavigateToProdutos?: (searchQuery?: string) => void;
+  onSavePopup?: (item: SavedPopupItem) => void;
   canUndo?: boolean;
   canRedo?: boolean;
   lastActionDescription?: string;
@@ -74,6 +75,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onRecontar,
   onToggleDesativar,
   onNavigateToProdutos,
+  onSavePopup,
   canUndo = false,
   canRedo = false,
   lastActionDescription,
@@ -153,6 +155,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     qtde: number;
     valor: number;
     peso: number;
+    unitPrice: number;
+    variacaoCx: number;
+    impactoVariacao: number;
     isFalta: boolean;
     analysis: ItemAnalysis;
     x: number;
@@ -174,13 +179,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   ) => {
     if (!item.analysis) return;
     const rect = e.currentTarget.getBoundingClientRect();
+    const isFalta = item.isFalta ?? isFaltaDefault;
+
+    // Busca o preço unitário da caixa na Tabela 7 (U)
+    const prod = effectiveCalculated.find((p) => p.c === item.c);
+    const resEntry = data.res.find((x) => x[0] === item.c);
+    const unitPrice =
+      prod?.U ||
+      (resEntry ? Number(resEntry[5]) : 0) ||
+      (item.qtde > 0 ? Math.abs(item.valor) / item.qtde : 0);
+
+    const variacaoCx = item.analysis.hoje - item.analysis.ontem;
+    const impactoVariacao = isFalta
+      ? -(variacaoCx * unitPrice)
+      : variacaoCx * unitPrice;
+
     setHoveredItem({
       code: item.c,
       desc: item.d,
       qtde: item.qtde,
       valor: item.valor,
       peso: item.peso,
-      isFalta: item.isFalta ?? isFaltaDefault,
+      unitPrice,
+      variacaoCx,
+      impactoVariacao,
+      isFalta,
       analysis: item.analysis,
       x: rect.right,
       y: rect.top,
@@ -617,6 +640,69 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return list;
   }, [maxRows, f, s, statusFilter, matched021101Map]);
 
+  // Função para salvar o pop-up do produto na aba de POP-UPS SALVOS por duplo clique na QTDE
+  const handleDoubleClickQuantity = (
+    r: {
+      c: number;
+      d: string;
+      qtde: number;
+      valor: number;
+      peso: number;
+      analysis?: ItemAnalysis;
+    },
+    isFalta: boolean
+  ) => {
+    if (!onSavePopup) return;
+    const analysis = r.analysis || analyzeRow(r.c, isFalta, r.qtde);
+    const last5 = getProductLast5Days(r.c, isFalta, r.qtde);
+    const matched = matched021101Map.get(r.c);
+
+    // Preço da caixa na Tabela 7 (U)
+    const prod = effectiveCalculated.find((p) => p.c === r.c);
+    const resEntry = data.res.find((x) => x[0] === r.c);
+    const unitPrice =
+      prod?.U ||
+      (resEntry ? Number(resEntry[5]) : 0) ||
+      (r.qtde > 0 ? Math.abs(r.valor) / r.qtde : 0);
+
+    const variacaoCx = analysis.hoje - analysis.ontem;
+    const impactoVariacao = isFalta
+      ? -(variacaoCx * unitPrice)
+      : variacaoCx * unitPrice;
+
+    const item: SavedPopupItem = {
+      id: `popup_${r.c}_${Date.now()}`,
+      code: r.c,
+      desc: r.d,
+      isFalta,
+      qtde: r.qtde,
+      valor: r.valor,
+      peso: r.peso,
+      unitPrice,
+      variacaoCx,
+      impactoVariacao,
+      savedAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      analysis: {
+        status: analysis.status,
+        diff: analysis.diff,
+        hoje: analysis.hoje,
+        ontem: analysis.ontem,
+        label: analysis.label,
+        bg: analysis.bg,
+        color: analysis.color,
+      },
+      last5Days: last5,
+      matched021101: matched
+        ? {
+            statusText: matched.statusText,
+            confirmedQty: matched.confirmedQty,
+          }
+        : null,
+    };
+
+    onSavePopup(item);
+  };
+
   // Renderizador de Tabela Individual para Modos Empilhado / Foco
   const renderSingleRankingTable = (isFalta: boolean) => {
     const items = isFalta ? f : s;
@@ -705,9 +791,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <td title={r.d}>{r.d}</td>
                   <td 
                     className="c font-mono"
+                    title="Dê DUPLO CLIQUE para salvar este pop-up na aba POP-UPS SALVOS"
                     style={r.qtde === 0 ? { color: '#888', background: 'transparent' } : r.analysis ? { background: r.analysis.bg, color: r.analysis.color, fontWeight: 'bold', cursor: 'pointer' } : undefined}
                     onMouseEnter={(e) => handleQuantityMouseEnter(e, r, isFalta)}
                     onMouseLeave={handleQuantityMouseLeave}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      handleDoubleClickQuantity(r, isFalta);
+                    }}
                   >
                     {N(r.qtde)}
                   </td>
@@ -1374,6 +1465,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             </td>
                             <td 
                               className="c font-mono"
+                              title="Dê DUPLO CLIQUE para salvar este pop-up na aba POP-UPS SALVOS"
                               style={
                                 rf.qtde === 0
                                   ? { color: '#888', background: 'transparent' }
@@ -1382,7 +1474,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                       background: rf.analysis.bg, 
                                       color: rf.analysis.color, 
                                       fontWeight: 'bold',
-                                      cursor: rf.analysis.status !== 'verde' ? 'pointer' : 'default',
+                                      cursor: 'pointer',
                                     } 
                                   : undefined
                               }
@@ -1390,6 +1482,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                 if (rf.analysis && rf.analysis.status !== 'verde' && onOpenAnalise) {
                                   onOpenAnalise(rf.analysis.status, rf.c);
                                 }
+                              }}
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                handleDoubleClickQuantity(rf, true);
                               }}
                               onMouseEnter={(e) => handleQuantityMouseEnter(e, rf, true)}
                               onMouseLeave={handleQuantityMouseLeave}
@@ -1514,6 +1610,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             </td>
                             <td 
                               className="c font-mono"
+                              title="Dê DUPLO CLIQUE para salvar este pop-up na aba POP-UPS SALVOS"
                               style={
                                 rs.qtde === 0
                                   ? { color: '#888', background: 'transparent' }
@@ -1522,7 +1619,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                       background: rs.analysis.bg, 
                                       color: rs.analysis.color, 
                                       fontWeight: 'bold',
-                                      cursor: rs.analysis.status !== 'verde' ? 'pointer' : 'default',
+                                      cursor: 'pointer',
                                     } 
                                   : undefined
                               }
@@ -1530,6 +1627,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                 if (rs.analysis && rs.analysis.status !== 'verde' && onOpenAnalise) {
                                   onOpenAnalise(rs.analysis.status, rs.c);
                                 }
+                              }}
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                handleDoubleClickQuantity(rs, false);
                               }}
                               onMouseEnter={(e) => handleQuantityMouseEnter(e, rs, false)}
                               onMouseLeave={handleQuantityMouseLeave}
@@ -1714,23 +1815,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             onClick={() => setIsPrintModalOpen(true)}
             style={{
               width: '100%',
-              padding: '7px 8px',
-              fontSize: '11px',
-              background: '#047857',
-              color: '#fff',
-              fontWeight: 'bold',
-              border: '1px solid #065F46',
-              borderRadius: '4px',
-              boxShadow: '0 1px 3px rgba(4, 120, 87, 0.3)',
+              padding: '8px 12px',
+              fontSize: '12px',
+              fontWeight: 800,
+              background: '#007A4D',
+              color: '#ffffff',
+              border: '2px solid #005030',
+              borderRadius: '8px',
+              boxShadow: '0 3px 4px rgba(0, 0, 0, 0.3)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
+              gap: '7px',
               cursor: 'pointer',
+              letterSpacing: '0.3px',
             }}
-            title="Print da Tela: Visualizar, copiar e baixar imagem com as 30 Faltas e 30 Sobras completas"
+            title="Print da Tela: Visualizar, imprimir e baixar imagem JPG com as 30 Faltas e 30 Sobras completas"
           >
-            <Camera size={14} />
+            <Camera size={16} color="#ffffff" strokeWidth={2.4} />
             <span>PRINT DA TELA</span>
           </button>
 
@@ -2309,6 +2411,44 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
+          {/* Painel do Impacto Financeiro da Variação (Ontem vs Hoje) com Tabela 7 */}
+          <div
+            style={{
+              background: hoveredItem.impactoVariacao < 0 ? '#fef2f2' : hoveredItem.impactoVariacao > 0 ? '#ecfdf5' : '#f8fafc',
+              border: `1px solid ${hoveredItem.impactoVariacao < 0 ? '#fecaca' : hoveredItem.impactoVariacao > 0 ? '#a7f3d0' : '#e2e8f0'}`,
+              borderRadius: '7px',
+              padding: '8px 10px',
+              marginBottom: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div>
+              <span style={{ display: 'block', fontSize: '10px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                Impacto da Variação (Ontem → Hoje)
+              </span>
+              <strong
+                style={{
+                  fontSize: '14px',
+                  display: 'block',
+                  color: hoveredItem.impactoVariacao < 0 ? '#dc2626' : hoveredItem.impactoVariacao > 0 ? '#16a34a' : '#475569',
+                }}
+              >
+                {hoveredItem.impactoVariacao < 0 ? '-' : hoveredItem.impactoVariacao > 0 ? '+' : ''}R${' '}
+                {Math.abs(hoveredItem.impactoVariacao).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </strong>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ display: 'block', fontSize: '9.5px', color: '#64748b', fontWeight: '600' }}>
+                Preço Tab. 7 / Cx:
+              </span>
+              <span style={{ fontSize: '11.5px', fontWeight: 'bold', color: '#1e293b' }}>
+                R$ {hoveredItem.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+
           {/* PAINEL: VARIAÇÃO DOS ÚLTIMOS 5 DIAS */}
           {(() => {
             const last5 = getProductLast5Days(hoveredItem.code, hoveredItem.isFalta, hoveredItem.qtde);
@@ -2365,7 +2505,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           {/* Dados Financeiros e Relevância no Fechamento */}
           <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '7px', padding: '9px 12px', marginBottom: '8px', fontSize: '11.5px', color: '#475569' }}>
-
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+              <span>Total Acumulado (Hoje):</span>
+              <strong style={{ color: '#0f172a' }}>{hoveredItem.qtde} cx (R$ {Math.abs(hoveredItem.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</strong>
+            </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>Peso no Fechamento:</span>
               <strong style={{ color: '#0f172a' }}>{Math.round(hoveredItem.peso * 100)}%</strong>
@@ -2373,11 +2516,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Dica de Ação */}
-          <div style={{ fontSize: '10.5px', color: '#94a3b8', textAlign: 'center', fontStyle: 'italic', marginTop: '6px' }}>
-            💡 Dê duplo clique no código para abrir a Recontagem deste produto
+          <div style={{ fontSize: '10.5px', color: '#64748b', textAlign: 'center', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ color: '#7C3AED', fontWeight: 'bold' }}>
+              📌 Dê DUPLO CLIQUE na quantidade para salvar este pop-up na aba POP-UPS SALVOS
+            </span>
+            <span style={{ fontStyle: 'italic', color: '#94a3b8' }}>
+              💡 Dê duplo clique no código para abrir a Recontagem deste produto
+            </span>
           </div>
         </div>
       )}
+
+      {/* MODAL PRINT DO TOP 30 FALTAS & SOBRAS */}
+      <PrintTop30Modal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        faltas={f}
+        sobras={s}
+        totalFaltas={tf}
+        totalSobras={ts}
+        saldoFinal={sd}
+        colorScaleF={cf}
+        colorScaleS={cs}
+        dateLabel={selectedDay !== null ? `Conciliação Histórica do Dia ${selectedDay}` : `Posição Oficial em ${new Date().toLocaleDateString('pt-BR')}`}
+      />
     </section>
   );
 };

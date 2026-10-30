@@ -4,19 +4,14 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { RawData, ResRow, AjustesData, MenRow, DiaRow, DashboardSnapshot } from './data/types';
+import { RawData, ResRow, AjustesData, MenRow, DiaRow, DashboardSnapshot, EstoqueCentralData, SavedPopupItem } from './data/types';
 import { initialRawData } from './data/defaultRawData';
 import { calculateProducts } from './utils/calc';
 import { saveStateToFirestore, loadStateFromFirestore, logActionToFirestore, subscribeToState } from './firebase';
-import { process020502 } from './utils/importer020502';
+import { process020502, parseColL } from './utils/importer020502';
 import { process020304 } from './utils/importer020304';
 import { processTabelaPrecos } from './utils/importerPrecos';
-import {
-  loadSnapshots,
-  persistSnapshot,
-  removeSnapshot,
-  downloadSnapshot020502Csv,
-} from './utils/snapshotStorage';
+// Snapshot storage removed
 
 // Views
 import { ResumoView } from './components/ResumoView';
@@ -29,8 +24,6 @@ import { RecontagemView } from './components/RecontagemView';
 import { Contagem021101View } from './components/Contagem021101View';
 import { createRecontagemFromProduct } from './data/defaultRecontagens';
 import { RecontagemItem, ContagemEstoqueItem } from './data/types';
-import { ContagemEstoqueView } from './components/ContagemEstoqueView';
-import { ContagemDiaView } from './components/ContagemDiaView';
 import { consolidateContagens, getItemDateString, mergeContagemItems } from './utils/contagemUtils';
 
 // Modals
@@ -42,9 +35,10 @@ import { SalvarDifModal } from './components/SalvarDifModal';
 import { PasswordModal } from './components/PasswordModal';
 import { EvolucaoDiariaView } from './components/EvolucaoDiariaView';
 import { ProdutosView } from './components/ProdutosView';
-import { VariacaoView } from './components/VariacaoView';
+import { PopupsSalvosView } from './components/PopupsSalvosView';
+import { Saved020502ConsultationView } from './components/Saved020502ConsultationView';
 
-type TabKey = 'dashboard' | 'variacao' | 'resumo' | 'ajustes' | 'dif_diaria' | 'dif_mensal' | 'ec' | 'recontagem' | 'contagem_estoque' | 'contagem_dia' | 'contagem_021101' | 'produtos';
+type TabKey = 'dashboard' | 'popups_salvos' | 'resumo' | 'ajustes' | 'dif_diaria' | 'dif_mensal' | 'ec' | 'saved_020502' | 'recontagem' | 'contagem_021101' | 'produtos';
 
 const STORAGE_KEY = 'estoque_guarabira_state_v5';
 
@@ -68,6 +62,48 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
   const [history, setHistory] = useState<{ data: RawData; desc: string }[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+
+  // Pop-ups Salvos para Auditoria e Print
+  const [savedPopups, setSavedPopups] = useState<SavedPopupItem[]>(() => {
+    try {
+      const raw = localStorage.getItem('estoque_guarabira_saved_popups');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('estoque_guarabira_saved_popups', JSON.stringify(savedPopups));
+    } catch (e) {
+      console.warn('LocalStorage error:', e);
+    }
+  }, [savedPopups]);
+
+  const handleSavePopup = (item: SavedPopupItem) => {
+    setSavedPopups((prev) => {
+      const existingIndex = prev.findIndex((p) => p.code === item.code && p.isFalta === item.isFalta);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = item;
+        setToastMessage(`✓ Pop-up de [${item.code}] ${item.desc} atualizado na aba POP-UPS SALVOS!`);
+        return updated;
+      }
+      setToastMessage(`✓ Pop-up de [${item.code}] ${item.desc} salvo na aba POP-UPS SALVOS!`);
+      return [item, ...prev];
+    });
+  };
+
+  const handleRemoveSavedPopup = (id: string) => {
+    setSavedPopups((prev) => prev.filter((p) => p.id !== id));
+    setToastMessage(`Item removido dos Pop-ups Salvos.`);
+  };
+
+  const handleClearSavedPopups = () => {
+    setSavedPopups([]);
+    setToastMessage(`Todos os Pop-ups Salvos foram limpos.`);
+  };
 
   // Modais e Banners
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -202,29 +238,46 @@ export default function App() {
     setIsImportModalOpen(true);
   };
 
-  // Snapshots de Fechamento Diário da 02.05.02
-  const [snapshots, setSnapshots] = useState<DashboardSnapshot[]>(() => loadSnapshots());
+  // Fechamentos 02.05.02 Salvos para Consulta
+  const [savedSnapshots, setSavedSnapshots] = useState<DashboardSnapshot[]>(() => {
+    try {
+      const raw = localStorage.getItem('estoque_guarabira_saved_snapshots');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('estoque_guarabira_saved_snapshots', JSON.stringify(savedSnapshots));
+    } catch (e) {
+      console.warn('LocalStorage snapshots error:', e);
+    }
+  }, [savedSnapshots]);
 
   const handleSaveSnapshot = (snapshot: DashboardSnapshot) => {
-    const updated = persistSnapshot(snapshot);
-    setSnapshots(updated);
-    const nextData = {
-      ...data,
-      dashboardSnapshots: updated,
-    };
-    updateDataWithHistory(nextData, `Salvou Fechamento do Dia: ${snapshot.date} (${snapshot.label})`);
-    setToastMessage(`✓ Fechamento da 02.05.02 do dia ${snapshot.date.split('-').reverse().join('/')} salvo com sucesso!`);
+    setSavedSnapshots((prev) => {
+      const existing = prev.findIndex((s) => s.id === snapshot.id || s.date === snapshot.date);
+      if (existing >= 0) {
+        const updated = [...prev];
+        updated[existing] = snapshot;
+        setToastMessage(`✓ Fechamento 02.05.02 do dia ${snapshot.date.split('-').reverse().join('/')} atualizado na aba 02.05.02 SALVAS!`);
+        return updated;
+      }
+      setToastMessage(`✓ Fechamento 02.05.02 do dia ${snapshot.date.split('-').reverse().join('/')} salvo na aba 02.05.02 SALVAS!`);
+      return [snapshot, ...prev];
+    });
   };
 
   const handleDeleteSnapshot = (id: string) => {
-    const updated = removeSnapshot(id);
-    setSnapshots(updated);
-    const nextData = {
-      ...data,
-      dashboardSnapshots: updated,
-    };
-    updateDataWithHistory(nextData, `Excluiu snapshot de fechamento`);
-    setToastMessage(`✓ Snapshot de fechamento removido.`);
+    setSavedSnapshots((prev) => prev.filter((s) => s.id !== id));
+    setToastMessage(`Fechamento 02.05.02 excluído.`);
+  };
+
+  const handleClearAllSnapshots = () => {
+    setSavedSnapshots([]);
+    setToastMessage(`Todos os fechamentos 02.05.02 salvos foram limpos.`);
   };
 
   // Importação do relatório 02.05.02 (Centralizado na aba de Estoque Central e propagado para toda a plataforma)
@@ -232,61 +285,19 @@ export default function App() {
     content: string,
     fileName: string,
     targetTab: 'dashboard' | 'ec' | 'grade' = 'ec',
-    autoSaveDailySnapshot: boolean = true
+    autoSaveDailySnapshot: boolean = false
   ) => {
     try {
       const res = process020502(content, fileName, data, 'ec');
       if (res.success && res.nextData) {
         let finalData = res.nextData;
 
-        // Se marcado para salvar automaticamente o fechamento diário desta 02.05.02
-        if (autoSaveDailySnapshot) {
-          const d = new Date();
-          const y = d.getFullYear();
-          const m = String(d.getMonth() + 1).padStart(2, '0');
-          const day = String(d.getDate()).padStart(2, '0');
-          const dateStr = `${y}-${m}-${day}`;
 
-          const calcs = calculateProducts(finalData).C;
-          const faltas = calcs.filter((p) => p.W < 0);
-          const sobras = calcs.filter((p) => p.W > 0);
-          const tf = faltas.reduce((acc, p) => acc + p.W, 0);
-          const ts = sobras.reduce((acc, p) => acc + p.W, 0);
-          const sd = tf + ts;
-
-          const snapshot: DashboardSnapshot = {
-            id: `snap_${dateStr}`,
-            date: dateStr,
-            timestamp: Date.now(),
-            label: `Fechamento ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
-            ec: {
-              h: [...finalData.ec.h],
-              r: finalData.ec.r.map((r) => [...r]),
-            },
-            res: finalData.res.map((r) => [...r] as typeof r),
-            summary: {
-              tf,
-              ts,
-              sd,
-              countFaltas: faltas.length,
-              countSobras: sobras.length,
-            },
-            fileName,
-            savedAt: new Date().toISOString(),
-          };
-
-          const updatedSnaps = persistSnapshot(snapshot);
-          setSnapshots(updatedSnaps);
-          finalData = {
-            ...finalData,
-            dashboardSnapshots: updatedSnaps,
-          };
-        }
 
         updateDataWithHistory(finalData, `Importação 02.05.02 (Estoque Central): ${fileName}`);
         setEcBannerHtml(res.bannerHtml || null);
         setIsImportModalOpen(false);
-        setToastMessage(`✓ Relatório 02.05.02 importado com sucesso! ${autoSaveDailySnapshot ? '(Fechamento salvo no calendário)' : ''}`);
+        setToastMessage(`✓ Relatório 02.05.02 importado com sucesso no Estoque Central!`);
       } else {
         alert(res.message || 'Erro ao processar importação 02.05.02');
       }
@@ -295,32 +306,67 @@ export default function App() {
     }
   };
 
-  // Carrega uma 02.05.02 salva histórica para a plataforma inteira (igualzinho a importar uma nova 02.05.02)
+  // Carrega uma 02.05.02 salva histórica diretamente para o Estoque Central e navega para a aba
   const handleLoadSaved020502ToPlatform = (snapshot: DashboardSnapshot) => {
     if (!snapshot.ec || !snapshot.ec.h || !snapshot.ec.r || snapshot.ec.r.length === 0) {
       alert('Os dados da 02.05.02 desta data não estão disponíveis ou estão vazios.');
       return;
     }
 
-    const delimiter = ';';
-    const formatCell = (val: string | number) => {
-      const s = String(val ?? '');
-      if (s.includes(delimiter) || s.includes('"') || s.includes('\n')) {
-        return `"${s.replace(/"/g, '""')}"`;
+    try {
+      const newEc: EstoqueCentralData = {
+        h: [...snapshot.ec.h],
+        r: snapshot.ec.r.map((row) => [...row]),
+      };
+
+      let nextRes = data.res;
+      if (snapshot.res && Array.isArray(snapshot.res) && snapshot.res.length > 0) {
+        nextRes = snapshot.res.map((r) => [...r] as typeof r);
+      } else {
+        const ip = newEc.h.indexOf('Produto') >= 0 ? newEc.h.indexOf('Produto') : 3;
+        const idisp = newEc.h.indexOf('Disponivel') >= 0 ? newEc.h.indexOf('Disponivel') : 11;
+        const ecMap = new Map<number, number>();
+        newEc.r.forEach((r) => {
+          const cod = Number(r[ip]);
+          const disp = parseColL(r[idisp]);
+          if (!isNaN(cod) && cod > 0) {
+            ecMap.set(cod, disp);
+          }
+        });
+
+        nextRes = data.res.map((r) => {
+          const cod = r[0];
+          if (ecMap.has(cod)) {
+            const rowCopy = [...r] as typeof r;
+            const fator = rowCopy[4] > 0 ? rowCopy[4] : 1;
+            const dispCx = ecMap.get(cod) || 0;
+            rowCopy[3] = Math.round(dispCx * fator);
+            return rowCopy;
+          }
+          return r;
+        });
       }
-      return s;
-    };
 
-    const headerLine = snapshot.ec.h.map(formatCell).join(delimiter);
-    const dataLines = snapshot.ec.r.map((row) => row.map(formatCell).join(delimiter));
-    const csvContent = '\ufeff' + [headerLine, ...dataLines].join('\r\n');
+      const nextData: RawData = {
+        ...data,
+        ec: newEc,
+        res: nextRes,
+      };
 
-    const fileName = snapshot.fileName || `02.05.02_${snapshot.date}.csv`;
+      updateDataWithHistory(
+        nextData,
+        `Carregou 02.05.02 salva do dia ${snapshot.date.split('-').reverse().join('/')} no Estoque Central`
+      );
 
-    // Importa na plataforma inteira (atualiza Estoque Central, Resumo, Dashboard, etc.) sem duplicar snapshot
-    handleImport020502(csvContent, fileName, 'ec', false);
-
-    setToastMessage(`✓ Relatório 02.05.02 do dia ${snapshot.date.split('-').reverse().join('/')} aplicado em toda a plataforma!`);
+      // Muda para a aba de Estoque Central para visualização imediata
+      setActiveTab('ec');
+      setToastMessage(
+        `✓ 02.05.02 do dia ${snapshot.date.split('-').reverse().join('/')} carregada com sucesso no Estoque Central!`
+      );
+    } catch (e: any) {
+      console.error('Erro ao carregar 02.05.02:', e);
+      alert(`Falha ao carregar relatório: ${e?.message || e}`);
+    }
   };
 
   // Importação de Tabela de Preços (Tabela 7) via Estoque Central
@@ -1030,7 +1076,25 @@ export default function App() {
 
       {/* Main Navigation Tabs */}
       <nav className="app-nav print:hidden">
-        <b>ESTOQUE OFICIAL GUARABIRA</b>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginRight: '6px' }}>
+          <b>ESTOQUE OFICIAL GUARABIRA</b>
+          <span
+            style={{
+              width: '9px',
+              height: '9px',
+              borderRadius: '50%',
+              backgroundColor: isRealtimeActive ? '#16a34a' : '#eab308',
+              boxShadow: isRealtimeActive ? '0 0 6px #22c55e' : 'none',
+              display: 'inline-block',
+              transition: 'all 0.3s ease',
+            }}
+            title={
+              isRealtimeActive
+                ? 'Conectado em tempo real com todos os usuários via Firebase'
+                : 'Conectando ao banco em tempo real...'
+            }
+          />
+        </div>
 
         <button
           className={`k-tab ${activeTab === 'dashboard' ? 'on' : ''}`}
@@ -1040,16 +1104,31 @@ export default function App() {
         </button>
 
         <button
-          className={activeTab === 'variacao' ? 'on' : ''}
-          onClick={() => setActiveTab('variacao')}
+          className={activeTab === 'popups_salvos' ? 'on' : ''}
+          onClick={() => setActiveTab('popups_salvos')}
           style={
-            activeTab === 'variacao'
-              ? { background: '#090D16', color: '#FFC000', borderColor: '#000' }
-              : { background: '#1E293B', color: '#F8FAFC' }
+            activeTab === 'popups_salvos'
+              ? { background: '#7C3AED', color: '#FFFFFF', borderColor: '#A78BFA', fontWeight: '800' }
+              : { background: '#6D28D9', color: '#EDE9FE', fontWeight: 'bold' }
           }
-          title="Variação de Faltas e Sobras (Comparativo Hoje vs. Ontem / Base Congelada)"
+          title="Aba de Pop-ups Salvos: Selecione produtos dando duplo clique na quantidade (QTDE) no Dashboard"
         >
-          VARIAÇÃO
+          POP-UPS SALVOS
+          {savedPopups.length > 0 && (
+            <span
+              style={{
+                marginLeft: '5px',
+                background: activeTab === 'popups_salvos' ? '#FFFFFF' : '#FFC000',
+                color: '#000000',
+                borderRadius: '999px',
+                padding: '1px 6px',
+                fontSize: '9.5px',
+                fontWeight: 'bold',
+              }}
+            >
+              {savedPopups.length}
+            </span>
+          )}
         </button>
 
         <button
@@ -1087,6 +1166,40 @@ export default function App() {
           ESTOQUE CENTRAL
         </button>
 
+        <button
+          className={activeTab === 'saved_020502' ? 'on' : ''}
+          onClick={() => setActiveTab('saved_020502')}
+          style={
+            activeTab === 'saved_020502'
+              ? { background: '#D97706', color: '#FFFFFF', borderColor: '#F59E0B', fontWeight: '800' }
+              : { background: '#B45309', color: '#FEF3C7', fontWeight: 'bold' }
+          }
+          title="Aba de Consulta de relatórios 02.05.02 salvos"
+        >
+          02.05.02 SALVAS
+          {savedSnapshots.length > 0 && (
+            <span
+              style={{
+                marginLeft: '5px',
+                background: activeTab === 'saved_020502' ? '#FFFFFF' : '#FFC000',
+                color: '#000000',
+                borderRadius: '999px',
+                padding: '1px 6px',
+                fontSize: '9.5px',
+                fontWeight: 'bold',
+              }}
+            >
+              {savedSnapshots.length}
+            </span>
+          )}
+        </button>
+
+
+
+
+
+
+
 
 
         <button
@@ -1103,12 +1216,12 @@ export default function App() {
           {(data.recontagens?.length || 0) > 0 && (
             <span
               style={{
-                marginLeft: '6px',
+                marginLeft: '4px',
                 background: activeTab === 'recontagem' ? '#fff' : '#000',
                 color: activeTab === 'recontagem' ? '#000' : '#FFC000',
                 borderRadius: '999px',
-                padding: '1px 6px',
-                fontSize: '10px',
+                padding: '0 4px',
+                fontSize: '9px',
                 fontWeight: 'bold',
               }}
             >
@@ -1117,68 +1230,32 @@ export default function App() {
           )}
         </button>
 
-
-
-        <button
-          className={activeTab === 'contagem_estoque' ? 'on' : ''}
-          onClick={() => setActiveTab('contagem_estoque')}
-          style={
-            activeTab === 'contagem_estoque'
-              ? { background: '#D97706', color: '#fff' }
-              : { background: '#B45309', color: '#FEF3C7' }
-          }
-          title="Contagem de Estoque: Lançamento rápido por Pallet, Lastro, Caixa e Unidades"
-        >
-          CONTAGEM ESTOQUE
-        </button>
-
-        <button
-          className={activeTab === 'contagem_dia' ? 'on' : ''}
-          onClick={() => setActiveTab('contagem_dia')}
-          style={
-            activeTab === 'contagem_dia'
-              ? { background: '#0284C7', color: '#fff' }
-              : { background: '#0369A1', color: '#E0F2FE' }
-          }
-          title="Contagem do Dia: Relatório consolidado com o que os conferentes contaram no dia"
-        >
-          CONTAGEM DO DIA
-          {(() => {
-            const today = new Date().toLocaleDateString('pt-BR');
-            const todayCount = (data.contagensEstoque || []).filter((it) => {
-              if (it.timestamp) return new Date(it.timestamp).toLocaleDateString('pt-BR') === today;
-              if (it.dataHora) return it.dataHora.includes(today);
-              return false;
-            }).length;
-            return todayCount > 0 ? (
-              <span
-                style={{
-                  marginLeft: '6px',
-                  background: activeTab === 'contagem_dia' ? '#fff' : '#000',
-                  color: activeTab === 'contagem_dia' ? '#000' : '#38BDF8',
-                  borderRadius: '999px',
-                  padding: '1px 6px',
-                  fontSize: '10px',
-                  fontWeight: 'bold',
-                }}
-              >
-                {todayCount}
-              </span>
-            ) : null;
-          })()}
-        </button>
-
         <button
           className={activeTab === 'contagem_021101' ? 'on' : ''}
           onClick={() => setActiveTab('contagem_021101')}
           style={
             activeTab === 'contagem_021101'
-              ? { background: '#7C3AED', color: '#fff' }
-              : { background: '#6D28D9', color: '#EDE9FE' }
+              ? { background: '#D97706', color: '#fff', fontWeight: '800' }
+              : { background: '#B45309', color: '#FEF3C7', fontWeight: 'bold' }
           }
-          title="Contagem 02.11.01 (Comparativo de contagens)"
+          title="Aba REC 02 05 02: Recontagem 02.11.01 confrontada com 02.05.02 e calculada com a Tabela 7"
         >
-          CONT. 02.11.01
+          REC 02 05 02
+          {((data.contagem021101?.counts?.length || 1) > 0) && (
+            <span
+              style={{
+                marginLeft: '5px',
+                background: activeTab === 'contagem_021101' ? '#fff' : '#FFC000',
+                color: '#000',
+                borderRadius: '999px',
+                padding: '0 5px',
+                fontSize: '9.5px',
+                fontWeight: 'bold',
+              }}
+            >
+              {data.contagem021101?.counts?.length || 1}
+            </span>
+          )}
         </button>
 
         <button
@@ -1193,40 +1270,6 @@ export default function App() {
         >
           TODOS OS PRODUTOS
         </button>
-
-        {/* Indicador de Sincronização em Tempo Real entre Usuários */}
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '11px',
-            fontWeight: '700',
-            padding: '4px 10px',
-            borderRadius: '999px',
-            background: isRealtimeActive ? '#093c1d' : '#451a03',
-            color: isRealtimeActive ? '#4ade80' : '#fde047',
-            border: `1px solid ${isRealtimeActive ? '#16a34a' : '#ca8a04'}`,
-            marginLeft: 'auto',
-          }}
-          title={
-            isRealtimeActive
-              ? 'Conectado em tempo real com todos os usuários via Firebase'
-              : 'Conectando ao banco em tempo real...'
-          }
-        >
-          <span
-            style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: isRealtimeActive ? '#22c55e' : '#eab308',
-              boxShadow: isRealtimeActive ? '0 0 8px #22c55e' : 'none',
-              display: 'inline-block',
-            }}
-          />
-          <span>{isRealtimeActive ? 'TEMPO REAL ATIVO' : 'CONECTANDO...'}</span>
-        </div>
       </nav>
 
       {/* Main Content Area */}
@@ -1239,6 +1282,7 @@ export default function App() {
             t7BannerHtml={t7BannerHtml}
             ecBannerHtml={ecBannerHtml}
             onRecontar={handleRecontar}
+            onNavigateToDashboard={() => setActiveTab('dashboard')}
           />
         )}
 
@@ -1271,15 +1315,12 @@ export default function App() {
             res={data.res}
             data={data}
             calculated={calculatedProducts}
-            snapshots={snapshots}
             onSaveSnapshot={handleSaveSnapshot}
-            onDeleteSnapshot={handleDeleteSnapshot}
-            onDownloadSnapshot020502={downloadSnapshot020502Csv}
-            onLoadSaved020502ToPlatform={handleLoadSaved020502ToPlatform}
-            onImport={(txt, nome) => handleImport020502(txt, nome, 'ec')}
+            onImport={(txt, nome) => handleImport020502(txt, nome, 'ec', false)}
             importBannerHtml={ecBannerHtml}
             onClearBanner={() => setEcBannerHtml(null)}
             onNavigateToDashboard={() => setActiveTab('dashboard')}
+            onNavigateToTab={(tab) => setActiveTab(tab as TabKey)}
             onOpenImportModal={() => {
               setImportTargetTab('ec');
               setIsImportModalOpen(true);
@@ -1292,6 +1333,22 @@ export default function App() {
             onClearEc0304Banner={() => setEc0304BannerHtml(null)}
           />
         )}
+
+        {activeTab === 'saved_020502' && (
+          <Saved020502ConsultationView
+            savedSnapshots={savedSnapshots}
+            onLoadToEstoqueCentral={handleLoadSaved020502ToPlatform}
+            onDeleteSnapshot={handleDeleteSnapshot}
+            onClearAllSnapshots={handleClearAllSnapshots}
+            onNavigateToDashboard={() => setActiveTab('dashboard')}
+          />
+        )}
+
+
+
+
+
+
 
         {activeTab === 'dashboard' && (
           <DashboardView
@@ -1307,26 +1364,21 @@ export default function App() {
             onNavigateToProdutos={(search) => {
               setActiveTab('produtos');
             }}
+            onSavePopup={handleSavePopup}
             canUndo={historyIndex > 0}
             canRedo={historyIndex < history.length - 1}
             lastActionDescription={history[historyIndex]?.desc}
             onUndo={handleUndo}
             onRedo={handleRedo}
-            snapshots={snapshots}
-            onSaveSnapshot={handleSaveSnapshot}
-            onDeleteSnapshot={handleDeleteSnapshot}
-            onDownloadSnapshot020502={downloadSnapshot020502Csv}
           />
         )}
 
-        {activeTab === 'variacao' && (
-          <VariacaoView
-            data={data}
-            calculatedProducts={calculatedProducts}
-            calculatedMap={calculatedMap}
-            snapshots={snapshots}
-            onRecontar={handleRecontar}
-            onNavigateToTab={(tab) => setActiveTab(tab as TabKey)}
+        {activeTab === 'popups_salvos' && (
+          <PopupsSalvosView
+            savedPopups={savedPopups}
+            onRemovePopup={handleRemoveSavedPopup}
+            onClearAll={handleClearSavedPopups}
+            onNavigateToDashboard={() => setActiveTab('dashboard')}
           />
         )}
 
@@ -1343,36 +1395,11 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'contagem_estoque' && (
-          <ContagemEstoqueView
-            data={{ ...data, contagensEstoque: consolidateContagens(data.contagensEstoque || []) }}
-            calculatedProducts={calculatedProducts}
-            onSaveContagem={handleSaveContagemEstoque}
-            onUpdateContagem={handleUpdateContagemEstoque}
-            onDeleteContagem={handleDeleteContagemEstoque}
-            onClearAllContagens={handleClearAllContagensEstoque}
-            onAplicarContagensAoEstoque={handleAplicarContagensAoEstoque}
-            onNavigateToContagemDia={() => setActiveTab('contagem_dia')}
-          />
-        )}
-
-        {activeTab === 'contagem_dia' && (
-          <ContagemDiaView
-            data={{ ...data, contagensEstoque: consolidateContagens(data.contagensEstoque || []) }}
-            calculatedProducts={calculatedProducts}
-            onUpdateContagem={handleUpdateContagemEstoque}
-            onDeleteContagem={handleDeleteContagemEstoque}
-            onAplicarContagensAoEstoque={handleAplicarContagensAoEstoque}
-            onNavigateToContagem={() => setActiveTab('contagem_estoque')}
-          />
-        )}
-
-
-
         {activeTab === 'contagem_021101' && (
           <Contagem021101View
             data={data}
             onUpdateData={(newData, desc) => updateDataWithHistory(newData, desc)}
+            onNavigateToTab={(tab) => setActiveTab(tab as TabKey)}
           />
         )}
 

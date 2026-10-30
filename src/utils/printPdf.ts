@@ -79,8 +79,8 @@ export function generateRecontagemPDF(
     ]);
 
     const N = recontagens.length;
-    const fontSize = N > 25 ? 6 : 7.5;
-    const cellPadding = N > 25 ? 1.5 : 2.5;
+    const fontSize = N > 25 ? 7 : 8.5;
+    const cellPadding = N > 25 ? 2.0 : 3.0;
 
     autoTable(doc, {
       startY: 42,
@@ -94,6 +94,7 @@ export function generateRecontagemPDF(
       ],
       body: tableData,
       theme: 'grid',
+      tableWidth: 182,
       styles: {
         font: 'helvetica',
         fontSize: fontSize,
@@ -112,10 +113,10 @@ export function generateRecontagemPDF(
         lineWidth: 0.2,
       },
       columnStyles: {
-        0: { halign: 'center', cellWidth: 8 },
-        1: { halign: 'center', fontStyle: 'bold', cellWidth: 22 },
-        2: { halign: 'center', cellWidth: 82 },
-        3: { halign: 'center', cellWidth: 14 },
+        0: { halign: 'center', cellWidth: 10 },
+        1: { halign: 'center', fontStyle: 'bold', cellWidth: 28 },
+        2: { halign: 'left', cellWidth: 120 },
+        3: { halign: 'center', cellWidth: 24 },
       },
       alternateRowStyles: {
         fillColor: [250, 250, 250],
@@ -187,13 +188,15 @@ export function printDirectSheet(recontagens: RecontagemItem[]): boolean {
         <style>
           @page {
             size: A4 portrait;
-            margin: 8mm 10mm;
+            margin: 10mm 14mm;
           }
           * { box-sizing: border-box; }
           body {
             font-family: Arial, "Helvetica Neue", sans-serif;
             color: #000;
-            margin: 0;
+            margin: 0 auto;
+            max-width: 182mm;
+            width: 100%;
             padding: 0;
             background: #fff;
             -webkit-print-color-adjust: exact;
@@ -242,22 +245,21 @@ export function printDirectSheet(recontagens: RecontagemItem[]): boolean {
             background-color: #FFC000 !important;
             color: #000 !important;
             border: 1px solid #000;
-            padding: 3px 2px;
+            padding: 5px 4px;
             font-weight: bold;
-            font-size: 9px;
+            font-size: 10px;
             text-align: center;
           }
           td {
             border: 1px solid #777;
-            padding: 3px 2px;
-            text-align: center;
-            font-size: 9px;
+            padding: 5px 4px;
+            font-size: 10px;
           }
-          .col-num { width: 32px; font-weight: bold; color: #555; }
-          .col-cod { width: 90px; font-weight: bold; font-family: monospace; font-size: 12px; }
-          .col-desc { font-weight: bold; text-align: center; }
+          .col-num { width: 36px; font-weight: bold; color: #555; text-align: center; }
+          .col-cod { width: 95px; font-weight: bold; font-family: monospace; font-size: 12px; text-align: center; }
+          .col-desc { font-weight: bold; text-align: left; padding-left: 8px; }
           .col-count { width: 110px; font-size: 9px; color: #666; letter-spacing: 1px; }
-          .col-visto { width: 60px; text-align: center; }
+          .col-visto { width: 80px; text-align: center; }
           .signatures {
             margin-top: 50px;
             display: flex;
