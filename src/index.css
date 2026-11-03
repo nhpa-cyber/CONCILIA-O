@@ -874,13 +874,8 @@ td {
     background: #ffffff !important;
     color: #000000 !important;
     font-size: 11pt !important;
-    margin: 0 auto !important;
+    margin: 0 !important;
     padding: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    width: 100% !important;
   }
 
   .top-black-bar,

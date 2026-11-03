@@ -36,9 +36,8 @@ import { PasswordModal } from './components/PasswordModal';
 import { EvolucaoDiariaView } from './components/EvolucaoDiariaView';
 import { ProdutosView } from './components/ProdutosView';
 import { PopupsSalvosView } from './components/PopupsSalvosView';
-import { Saved020502ConsultationView } from './components/Saved020502ConsultationView';
 
-type TabKey = 'dashboard' | 'popups_salvos' | 'resumo' | 'ajustes' | 'dif_diaria' | 'dif_mensal' | 'ec' | 'saved_020502' | 'recontagem' | 'contagem_021101' | 'produtos';
+type TabKey = 'dashboard' | 'popups_salvos' | 'resumo' | 'ajustes' | 'dif_diaria' | 'dif_mensal' | 'ec' | 'recontagem' | 'contagem_021101' | 'produtos';
 
 const STORAGE_KEY = 'estoque_guarabira_state_v5';
 
@@ -238,47 +237,10 @@ export default function App() {
     setIsImportModalOpen(true);
   };
 
-  // Fechamentos 02.05.02 Salvos para Consulta
-  const [savedSnapshots, setSavedSnapshots] = useState<DashboardSnapshot[]>(() => {
-    try {
-      const raw = localStorage.getItem('estoque_guarabira_saved_snapshots');
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('estoque_guarabira_saved_snapshots', JSON.stringify(savedSnapshots));
-    } catch (e) {
-      console.warn('LocalStorage snapshots error:', e);
-    }
-  }, [savedSnapshots]);
-
-  const handleSaveSnapshot = (snapshot: DashboardSnapshot) => {
-    setSavedSnapshots((prev) => {
-      const existing = prev.findIndex((s) => s.id === snapshot.id || s.date === snapshot.date);
-      if (existing >= 0) {
-        const updated = [...prev];
-        updated[existing] = snapshot;
-        setToastMessage(`✓ Fechamento 02.05.02 do dia ${snapshot.date.split('-').reverse().join('/')} atualizado na aba 02.05.02 SALVAS!`);
-        return updated;
-      }
-      setToastMessage(`✓ Fechamento 02.05.02 do dia ${snapshot.date.split('-').reverse().join('/')} salvo na aba 02.05.02 SALVAS!`);
-      return [snapshot, ...prev];
-    });
-  };
-
-  const handleDeleteSnapshot = (id: string) => {
-    setSavedSnapshots((prev) => prev.filter((s) => s.id !== id));
-    setToastMessage(`Fechamento 02.05.02 excluído.`);
-  };
-
-  const handleClearAllSnapshots = () => {
-    setSavedSnapshots([]);
-    setToastMessage(`Todos os fechamentos 02.05.02 salvos foram limpos.`);
-  };
+  // Snapshots removidos
+  const [snapshots] = useState<DashboardSnapshot[]>([]);
+  const handleSaveSnapshot = () => {};
+  const handleDeleteSnapshot = () => {};
 
   // Importação do relatório 02.05.02 (Centralizado na aba de Estoque Central e propagado para toda a plataforma)
   const handleImport020502 = (
@@ -1166,34 +1128,6 @@ export default function App() {
           ESTOQUE CENTRAL
         </button>
 
-        <button
-          className={activeTab === 'saved_020502' ? 'on' : ''}
-          onClick={() => setActiveTab('saved_020502')}
-          style={
-            activeTab === 'saved_020502'
-              ? { background: '#D97706', color: '#FFFFFF', borderColor: '#F59E0B', fontWeight: '800' }
-              : { background: '#B45309', color: '#FEF3C7', fontWeight: 'bold' }
-          }
-          title="Aba de Consulta de relatórios 02.05.02 salvos"
-        >
-          02.05.02 SALVAS
-          {savedSnapshots.length > 0 && (
-            <span
-              style={{
-                marginLeft: '5px',
-                background: activeTab === 'saved_020502' ? '#FFFFFF' : '#FFC000',
-                color: '#000000',
-                borderRadius: '999px',
-                padding: '1px 6px',
-                fontSize: '9.5px',
-                fontWeight: 'bold',
-              }}
-            >
-              {savedSnapshots.length}
-            </span>
-          )}
-        </button>
-
 
 
 
@@ -1331,16 +1265,6 @@ export default function App() {
             onClearPrecosBanner={() => setPrecosBannerHtml(null)}
             ec0304BannerHtml={ec0304BannerHtml}
             onClearEc0304Banner={() => setEc0304BannerHtml(null)}
-          />
-        )}
-
-        {activeTab === 'saved_020502' && (
-          <Saved020502ConsultationView
-            savedSnapshots={savedSnapshots}
-            onLoadToEstoqueCentral={handleLoadSaved020502ToPlatform}
-            onDeleteSnapshot={handleDeleteSnapshot}
-            onClearAllSnapshots={handleClearAllSnapshots}
-            onNavigateToDashboard={() => setActiveTab('dashboard')}
           />
         )}
 

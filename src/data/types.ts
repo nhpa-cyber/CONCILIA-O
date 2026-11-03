@@ -148,7 +148,6 @@ export interface RawData {
   };
   contagemGps?: ContagemGpsItem[];
   contagensEstoque?: ContagemEstoqueItem[];
-  recontagem020502?: any;
 }
 
 export interface ContagemEstoqueItem {
