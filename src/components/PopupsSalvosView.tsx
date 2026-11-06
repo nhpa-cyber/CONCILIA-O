@@ -15,7 +15,9 @@ import {
   Columns,
   LayoutGrid,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  List,
+  Table
 } from 'lucide-react';
 import { formatBRL } from '../utils/formatters';
 import { toJpeg } from 'html-to-image';
@@ -135,7 +137,7 @@ export const PopupsSalvosView: React.FC<PopupsSalvosViewProps> = ({
   const rowScrollRef = useRef<HTMLDivElement>(null);
   const [isExportingJpg, setIsExportingJpg] = useState(false);
   const [exportingCardId, setExportingCardId] = useState<string | null>(null);
-  const [layoutMode, setLayoutMode] = useState<'fit' | 'scroll' | 'grid'>('fit'); // Padrão: 'fit' (Ajustar todos os cards na tela sem barra)
+  const [layoutMode, setLayoutMode] = useState<'table' | 'linear' | 'grid' | 'fit'>('table'); // Padrão: 'table' (Por Linha e Coluna)
 
   const handlePrint = () => {
     window.print();
@@ -399,43 +401,31 @@ export const PopupsSalvosView: React.FC<PopupsSalvosViewProps> = ({
               Sobras ({totals.countSobras})
             </button>
 
-            {/* Alternador de Layout: Ajustar à Tela (Sem barra) vs Com Rolagem vs Grade */}
+            {/* Alternador de Layout: Tabela (Linha e Coluna - Padrão) vs Cards */}
             <div className="flex items-center gap-1 border-l border-slate-200 pl-2.5 ml-1">
               <button
-                onClick={() => setLayoutMode('fit')}
+                onClick={() => setLayoutMode('table')}
                 className={`flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-md border transition ${
-                  layoutMode === 'fit'
+                  layoutMode === 'table'
                     ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
                     : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
                 }`}
-                title="Ajustar todos os cards na tela sem barra de rolagem"
+                title="Tabela: Visualização por Linha e Coluna (Código, Descrição, Variação, Impacto, Preço Tab 7, Ontem vs Hoje, Últimas 5 Diferenças)"
               >
-                <Columns className="w-3.5 h-3.5" />
-                <span>Ajustar à Tela (Sem barra)</span>
+                <Table className="w-3.5 h-3.5" />
+                <span>Linha e Coluna (Tabela)</span>
               </button>
               <button
-                onClick={() => setLayoutMode('scroll')}
+                onClick={() => setLayoutMode('linear')}
                 className={`flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-md border transition ${
-                  layoutMode === 'scroll'
+                  layoutMode === 'linear'
                     ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
                     : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
                 }`}
-                title="Cards em tamanho maior com barra de rolagem horizontal"
+                title="Visualizar como cards"
               >
-                <ChevronRight className="w-3.5 h-3.5" />
-                <span>Com Rolagem</span>
-              </button>
-              <button
-                onClick={() => setLayoutMode('grid')}
-                className={`flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-md border transition ${
-                  layoutMode === 'grid'
-                    ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
-                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
-                }`}
-                title="Visualizar em grade (várias linhas)"
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span>Grade</span>
+                <List className="w-3.5 h-3.5" />
+                <span>Cards</span>
               </button>
             </div>
           </div>
@@ -508,39 +498,19 @@ export const PopupsSalvosView: React.FC<PopupsSalvosViewProps> = ({
           </div>
         )}
 
-        {/* Informação / Barra de Navegação Horizontal */}
+        {/* Informação / Barra de Navegação */}
         {filteredPopups.length > 0 && (
           <div className="flex items-center justify-between mb-2.5 px-1 text-xs text-slate-600 font-semibold print:hidden">
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-purple-600"></span>
-              {layoutMode === 'fit' ? (
-                <span>Todos os <b>{filteredPopups.length}</b> cards lado a lado ajustados na tela (sem rolagem):</span>
-              ) : layoutMode === 'scroll' ? (
-                <span>Cards lado a lado com barra de rolagem (use o scroll ou setas):</span>
+              {layoutMode === 'table' ? (
+                <span>Tabela por Linha e Coluna (<b>{filteredPopups.length}</b> produtos salvos):</span>
+              ) : layoutMode === 'linear' ? (
+                <span>Lista linear dos <b>{filteredPopups.length}</b> produtos salvos (um abaixo do outro):</span>
               ) : (
-                <span>Cards distribuídos em grade:</span>
+                <span>Cards lado a lado:</span>
               )}
             </div>
-            {layoutMode === 'scroll' && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => scrollRow('left')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 shadow-2xs transition font-bold"
-                  title="Rolar cards para a esquerda"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>Anterior</span>
-                </button>
-                <button
-                  onClick={() => scrollRow('right')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 shadow-2xs transition font-bold"
-                  title="Rolar cards para a direita"
-                >
-                  <span>Próximo</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
           </div>
         )}
 
@@ -563,14 +533,275 @@ export const PopupsSalvosView: React.FC<PopupsSalvosViewProps> = ({
               <span>Ir para o Dashboard</span>
             </button>
           </div>
+        ) : layoutMode === 'table' ? (
+          /* ============================================================== */
+          /* VISUALIZAÇÃO POR LINHA E COLUNA (TABELA DE AUDITORIA)           */
+          /* ============================================================== */
+          <div className="w-full overflow-x-auto bg-white rounded-xl border-2 border-slate-200 shadow-sm">
+            <table className="w-full text-center border-collapse min-w-[960px] lg:min-w-full table-fixed">
+              <thead>
+                <tr className="bg-[#FFC000] text-black border-b-2 border-amber-600 shadow-xs">
+                  <th
+                    className="font-black text-black uppercase tracking-wider text-center bg-[#FFC000] border-r border-black/15 py-3 px-2 text-[11px] sm:text-xs md:text-[12.5px] leading-tight"
+                    style={{ width: '10%', minWidth: '95px', color: '#000000' }}
+                  >
+                    CÓDIGO DO PRODUTO
+                  </th>
+                  <th
+                    className="font-black text-black uppercase tracking-wider text-center bg-[#FFC000] border-r border-black/15 py-3 px-3 text-[11px] sm:text-xs md:text-[12.5px] leading-tight"
+                    style={{ width: '25%', minWidth: '170px', color: '#000000' }}
+                  >
+                    DESCRIÇÃO DO PRODUTO
+                  </th>
+                  <th
+                    className="font-black text-black uppercase tracking-wider text-center bg-[#FFC000] border-r border-black/15 py-3 px-2 text-[11px] sm:text-xs md:text-[12.5px] leading-tight"
+                    style={{ width: '8%', minWidth: '75px', color: '#000000' }}
+                  >
+                    VARIAÇÃO
+                  </th>
+                  <th
+                    className="font-black text-black uppercase tracking-wider text-center bg-[#FFC000] border-r border-black/15 py-3 px-2 text-[11px] sm:text-xs md:text-[12.5px] leading-tight"
+                    style={{ width: '11%', minWidth: '100px', color: '#000000' }}
+                  >
+                    IMPACTO
+                  </th>
+                  <th
+                    className="font-black text-black uppercase tracking-wider text-center bg-[#FFC000] border-r border-black/15 py-3 px-2 text-[11px] sm:text-xs md:text-[12.5px] leading-tight"
+                    style={{ width: '9%', minWidth: '85px', color: '#000000' }}
+                  >
+                    PREÇO TAB 7
+                  </th>
+                  <th
+                    className="font-black text-black uppercase tracking-wider text-center bg-[#FFC000] border-r border-black/15 py-3 px-3 text-[11px] sm:text-xs md:text-[12.5px] leading-tight"
+                    style={{ width: '16%', minWidth: '155px', color: '#000000' }}
+                  >
+                    ONTEM VS HOJE
+                  </th>
+                  <th
+                    className="font-black text-black uppercase tracking-wider text-center bg-[#FFC000] border-r border-black/15 py-3 px-3 text-[11px] sm:text-xs md:text-[12.5px] leading-tight"
+                    style={{ width: '16%', minWidth: '155px', color: '#000000' }}
+                  >
+                    ÚLTIMAS 5 DIFERENÇAS SALVAS
+                  </th>
+                  <th
+                    className="font-black text-black uppercase tracking-wider text-center bg-[#FFC000] py-3 px-1 text-[11px] sm:text-xs md:text-[12.5px] leading-tight print:hidden"
+                    style={{ width: '5%', minWidth: '60px', color: '#000000' }}
+                  >
+                    AÇÕES
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {filteredPopups.map((popup) => {
+                  const v = getPopupVariationInfo(popup);
+                  const isNegativeImpact = v.impactoFinanceiro < 0;
+                  const isPositiveImpact = v.impactoFinanceiro > 0;
+
+                  return (
+                    <tr
+                      key={popup.id}
+                      id={`popup-card-${popup.id}`}
+                      className={`hover:bg-slate-50/90 transition-colors ${
+                        popup.isFalta ? 'bg-red-50/25' : 'bg-emerald-50/25'
+                      }`}
+                    >
+                      {/* 1. CÓDIGO DO PRODUTO */}
+                      <td className="py-3.5 px-2 text-center align-middle whitespace-nowrap">
+                        <div className="flex flex-col items-center justify-center gap-1">
+                          <span className="font-mono font-black text-xs sm:text-[13px] text-slate-900 bg-white px-2.5 py-0.5 rounded border border-slate-300 shadow-2xs">
+                            #{popup.code}
+                          </span>
+                          <span
+                            className={`font-black text-[9px] sm:text-[10px] px-2 py-0.5 rounded uppercase tracking-wider shadow-2xs ${
+                              popup.isFalta ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'
+                            }`}
+                          >
+                            {popup.isFalta ? 'Falta' : 'Sobra'}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* 2. DESCRIÇÃO DO PRODUTO */}
+                      <td className="py-3.5 px-3 text-center align-middle">
+                        <div className="flex flex-col items-center justify-center text-center gap-1 min-w-0 overflow-hidden mx-auto">
+                          <span className="font-black text-xs sm:text-[13.5px] text-slate-950 leading-snug break-words line-clamp-2 text-center">
+                            {popup.desc}
+                          </span>
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                            <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] text-slate-500 font-mono font-medium">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              <span>{popup.savedAt}</span>
+                            </span>
+                            {popup.matched021101 && (
+                              <span className="text-emerald-800 font-black bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-300 text-[9px] truncate">
+                                ✓ {popup.matched021101.statusText}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 3. VARIAÇÃO */}
+                      <td className="py-3.5 px-2 text-center align-middle whitespace-nowrap">
+                        <div className="flex flex-col items-center justify-center">
+                          <span
+                            className={`text-xs sm:text-sm md:text-base font-black ${
+                              v.variacaoCx === 0
+                                ? 'text-slate-600'
+                                : popup.isFalta
+                                ? v.variacaoCx > 0
+                                  ? 'text-red-600'
+                                  : 'text-emerald-600'
+                                : v.variacaoCx > 0
+                                ? 'text-emerald-600'
+                                : 'text-red-600'
+                            }`}
+                          >
+                            {v.variacaoCx > 0 ? `+${v.variacaoCx}` : v.variacaoCx} cx
+                          </span>
+                          <span
+                            className={`text-[9.5px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded mt-0.5 ${
+                              popup.isFalta
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-emerald-100 text-emerald-700'
+                            }`}
+                          >
+                            {popup.isFalta ? 'Faltando' : 'Sobrando'}
+                          </span>
+                          <span className="text-[9px] text-slate-500 font-bold tracking-tight">vs ontem</span>
+                        </div>
+                      </td>
+
+                      {/* 4. IMPACTO */}
+                      <td className="py-3.5 px-2 text-center align-middle whitespace-nowrap">
+                        <div className="flex flex-col items-center justify-center">
+                          <span
+                            className={`text-xs sm:text-sm md:text-base font-black truncate max-w-full ${
+                              isNegativeImpact
+                                ? 'text-red-700'
+                                : isPositiveImpact
+                                ? 'text-emerald-700'
+                                : 'text-slate-700'
+                            }`}
+                          >
+                            {v.impactoFinanceiro === 0
+                              ? 'R$ 0,00'
+                              : `${isNegativeImpact ? '-' : '+'}R$ ${Math.abs(v.impactoFinanceiro).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                          </span>
+                          <span className="text-[9px] text-slate-500 font-bold tracking-tight">impacto diário</span>
+                        </div>
+                      </td>
+
+                      {/* 5. PREÇO TAB 7 */}
+                      <td className="py-3.5 px-2 text-center align-middle whitespace-nowrap">
+                        <div className="flex flex-col items-center justify-center">
+                          <span className="text-xs sm:text-[13px] font-black text-slate-950 bg-slate-100 px-2 py-1 rounded border border-slate-300 shadow-2xs truncate">
+                            R$ {v.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <span className="text-[9px] text-slate-500 font-semibold mt-0.5">por caixa</span>
+                        </div>
+                      </td>
+
+                      {/* 6. ONTEM VS HOJE */}
+                      <td className="py-3.5 px-3 text-center align-middle">
+                        <div className="flex flex-col items-center justify-center gap-1 w-full min-w-0 overflow-hidden mx-auto max-w-[210px]">
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                            <span
+                              className="font-black rounded border shadow-2xs text-[9px] px-2 py-0.5 truncate max-w-[120px] sm:max-w-none"
+                              style={{
+                                backgroundColor: popup.analysis.bg,
+                                color: popup.analysis.color,
+                                borderColor: popup.analysis.color + '40',
+                              }}
+                              title={popup.analysis.label}
+                            >
+                              {popup.analysis.label}
+                            </span>
+                            <span className="text-[10px] sm:text-[11px] text-slate-700 font-bold whitespace-nowrap">
+                              Hoje: <b className="text-slate-950 font-black">{v.hoje} cx</b>
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-center gap-2 text-[10px] sm:text-[10.5px] bg-slate-50 px-2.5 py-1 rounded border border-slate-200 w-full text-center">
+                            <span className="text-slate-600 truncate">Ontem: <b className="text-slate-900 font-black">{v.ontem} cx</b></span>
+                            <span className="text-slate-300">|</span>
+                            <span className="text-slate-600 truncate">Saldo: <b className="text-slate-900 font-black">{popup.qtde} cx</b></span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 7. ÚLTIMAS 5 DIFERENÇAS SALVAS */}
+                      <td className="py-3.5 px-3 text-center align-middle">
+                        <div className="flex flex-col items-center justify-center gap-1 w-full min-w-0 overflow-hidden mx-auto max-w-[220px]">
+                          {popup.last5Days && (
+                            <div className="flex items-center justify-center gap-2 text-[9.5px] font-black text-slate-600 mb-0.5">
+                              <span className="uppercase tracking-wider">Histórico</span>
+                              <span className="bg-slate-100 px-1.5 py-0.2 rounded border border-slate-300 text-slate-800 text-[10px] font-black">
+                                Méd: {popup.last5Days.avg}
+                              </span>
+                            </div>
+                          )}
+                          {popup.last5Days?.days && (
+                            <div className="grid grid-cols-5 gap-1 text-center w-full mx-auto">
+                              {popup.last5Days.days.map((d, idx) => (
+                                <div
+                                  key={idx}
+                                  className={`rounded p-1 border transition ${
+                                    d.isToday
+                                      ? 'bg-purple-100 border-2 border-purple-600 text-purple-950 font-black ring-1 ring-purple-300 shadow-2xs'
+                                      : 'bg-slate-50 border-slate-200 text-slate-800 font-bold'
+                                  }`}
+                                >
+                                  <span className="block text-[8px] text-slate-500 font-bold leading-tight truncate">
+                                    {d.label}
+                                  </span>
+                                  <span className="block text-[10.5px] sm:text-xs font-black leading-tight mt-0.5 truncate">
+                                    {d.qty}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 8. AÇÕES */}
+                      <td className="py-3.5 px-1 text-center align-middle whitespace-nowrap print:hidden">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => handleExportSingleCardJpg(popup.id, popup.desc, popup.code)}
+                            disabled={exportingCardId === popup.id}
+                            className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg border border-slate-300 transition shadow-2xs"
+                            title="Baixar print deste produto em JPG"
+                          >
+                            {exportingCardId === popup.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                            ) : (
+                              <Camera className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => onRemovePopup(popup.id)}
+                            className="p-1.5 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg border border-slate-300 transition shadow-2xs"
+                            title="Excluir este pop-up salvo"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div
             ref={rowScrollRef}
             className={
-              layoutMode === 'fit'
+              layoutMode === 'linear'
+                ? 'flex flex-col gap-4 w-full'
+                : layoutMode === 'fit'
                 ? 'grid w-full gap-2 items-stretch'
-                : layoutMode === 'scroll'
-                ? 'flex flex-row flex-nowrap gap-4 overflow-x-auto pb-4 pt-1 items-stretch scroll-smooth w-full'
                 : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5'
             }
             style={
@@ -583,6 +814,220 @@ export const PopupsSalvosView: React.FC<PopupsSalvosViewProps> = ({
               const v = getPopupVariationInfo(popup);
               const isNegativeImpact = v.impactoFinanceiro < 0;
               const isPositiveImpact = v.impactoFinanceiro > 0;
+
+              // RENDERIZAÇÃO LINEAR: Produtos um abaixo do outro com todas as informações expandidas
+              if (layoutMode === 'linear') {
+                return (
+                  <div
+                    key={popup.id}
+                    id={`popup-card-${popup.id}`}
+                    className={`w-full bg-white rounded-xl border-2 shadow-xs hover:shadow-md transition-all overflow-hidden flex flex-col ${
+                      popup.isFalta
+                        ? 'border-red-200/90 hover:border-red-300'
+                        : 'border-emerald-200/90 hover:border-emerald-300'
+                    }`}
+                  >
+                    {/* Barra de destaque superior */}
+                    <div className={`h-1.5 w-full ${popup.isFalta ? 'bg-red-500' : 'bg-emerald-500'}`} />
+
+                    {/* Header: Código, Badge Falta/Sobra, Descrição, Confirmado, Timestamp e Ações */}
+                    <div
+                      className={`px-4 py-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
+                        popup.isFalta
+                          ? 'bg-red-50/80 border-red-200/80'
+                          : 'bg-emerald-50/80 border-emerald-200/80'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 flex-wrap flex-1 min-w-0">
+                        <span className="font-mono font-bold text-xs text-slate-800 bg-white rounded border border-slate-300 shadow-2xs px-2 py-0.5">
+                          #{popup.code}
+                        </span>
+                        <span
+                          className={`font-extrabold text-[10px] px-2.5 py-0.5 rounded uppercase tracking-wider shadow-2xs ${
+                            popup.isFalta ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'
+                          }`}
+                        >
+                          {popup.isFalta ? 'Falta' : 'Sobra'}
+                        </span>
+                        <h3 className="font-extrabold text-sm text-slate-900 tracking-tight leading-snug">
+                          {popup.desc}
+                        </h3>
+                        {popup.matched021101 && (
+                          <span className="text-emerald-800 font-bold bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300 text-[10px] whitespace-nowrap">
+                            ✓ {popup.matched021101.statusText}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        <span className="flex items-center gap-1 text-[11px] font-mono text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{popup.savedAt}</span>
+                        </span>
+
+                        <button
+                          onClick={() => handleExportSingleCardJpg(popup.id, popup.desc, popup.code)}
+                          disabled={exportingCardId === popup.id}
+                          className="text-slate-500 hover:text-indigo-600 p-1.5 rounded-lg bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 transition shadow-2xs"
+                          title="Baixar print deste produto em JPG"
+                        >
+                          {exportingCardId === popup.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                          ) : (
+                            <Camera className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+
+                        <button
+                          onClick={() => onRemovePopup(popup.id)}
+                          className="text-slate-500 hover:text-red-600 p-1.5 rounded-lg bg-white border border-slate-200 hover:border-red-300 hover:bg-red-50 transition shadow-2xs"
+                          title="Excluir este pop-up salvo"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Corpo em 3 colunas lineares espaçosas */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 p-3.5 bg-slate-50/40 items-stretch">
+                      {/* Coluna 1: Variação & Impacto Financeiro (Preço Tab. 7) */}
+                      <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs flex flex-col justify-between">
+                        <div className="flex items-center justify-between font-extrabold text-[10px] text-slate-500 uppercase tracking-wide mb-2">
+                          <span className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${popup.isFalta ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                            <span>Variação & Impacto</span>
+                          </span>
+                          <span className="font-mono font-bold text-slate-700 bg-slate-100 rounded px-1.5 py-0.5 border border-slate-200">
+                            Tab. 7
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 text-center py-1">
+                          <div className="border-r border-slate-100 pr-1">
+                            <span className="text-[10px] text-slate-400 font-extrabold block uppercase tracking-tight">Variação</span>
+                            <span
+                              className={`text-base font-black block mt-0.5 ${
+                                v.variacaoCx === 0
+                                  ? 'text-slate-600'
+                                  : popup.isFalta
+                                  ? v.variacaoCx > 0
+                                    ? 'text-red-600'
+                                    : 'text-emerald-600'
+                                  : v.variacaoCx > 0
+                                  ? 'text-emerald-600'
+                                  : 'text-red-600'
+                              }`}
+                            >
+                              {v.variacaoCx > 0 ? `+${v.variacaoCx}` : v.variacaoCx} cx
+                            </span>
+                            <span
+                              className={`text-[9.5px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded inline-block mt-0.5 ${
+                                popup.isFalta ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+                              }`}
+                            >
+                              {popup.isFalta ? 'Faltando' : 'Sobrando'}
+                            </span>
+                          </div>
+
+                          <div className="border-r border-slate-100 px-1">
+                            <span className="text-[10px] text-slate-400 font-extrabold block uppercase tracking-tight">Impacto</span>
+                            <span
+                              className={`text-base font-black block mt-0.5 ${
+                                isNegativeImpact
+                                  ? 'text-red-700'
+                                  : isPositiveImpact
+                                  ? 'text-emerald-700'
+                                  : 'text-slate-700'
+                              }`}
+                            >
+                              {v.impactoFinanceiro === 0
+                                ? 'R$ 0,00'
+                                : `${isNegativeImpact ? '-' : '+'}R$ ${Math.abs(v.impactoFinanceiro).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                            </span>
+                          </div>
+
+                          <div className="pl-1">
+                            <span className="text-[10px] text-slate-400 font-extrabold block uppercase tracking-tight">Preço Tab. 7</span>
+                            <span className="text-sm font-black text-slate-900 block mt-1">
+                              R$ {v.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Coluna 2: Comparativo Ontem vs Hoje */}
+                      <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs flex flex-col justify-between">
+                        <div className="flex items-center justify-between font-extrabold text-[10px] text-slate-500 uppercase tracking-wide mb-2">
+                          <span>Ontem vs Hoje</span>
+                          <span
+                            className="font-bold rounded border shadow-2xs text-[10px] px-2 py-0.5"
+                            style={{
+                              backgroundColor: popup.analysis.bg,
+                              color: popup.analysis.color,
+                              borderColor: popup.analysis.color + '40',
+                            }}
+                          >
+                            {popup.analysis.label}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 bg-slate-50 rounded-lg p-2 border border-slate-200">
+                          <div>
+                            <span className="text-[9px] text-slate-400 block font-bold">Ontem:</span>
+                            <span className="font-extrabold text-slate-900 text-sm">{v.ontem} cx</span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-slate-400 block font-bold">Hoje:</span>
+                            <span className="font-extrabold text-slate-900 text-sm">{v.hoje} cx</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-slate-500 pt-2 border-t border-slate-100 text-xs mt-1">
+                          <span className="font-medium text-[11px]">Saldo Hoje:</span>
+                          <span className="font-extrabold text-slate-800 text-[11px]">
+                            {popup.qtde} cx ({formatBRL(popup.valor)})
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Coluna 3: Histórico dos Últimos 5 Dias */}
+                      <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs flex flex-col justify-between">
+                        <div className="flex items-center justify-between font-extrabold text-[10px] text-slate-500 uppercase tracking-wide mb-2">
+                          <span>Últimos 5 Dias</span>
+                          {popup.last5Days && (
+                            <span className="font-bold text-slate-600 bg-slate-100 rounded border border-slate-200 text-[10px] px-2 py-0.5">
+                              Méd: {popup.last5Days.avg}
+                            </span>
+                          )}
+                        </div>
+
+                        {popup.last5Days?.days && (
+                          <div className="grid grid-cols-5 gap-1.5 text-center my-auto">
+                            {popup.last5Days.days.map((d, idx) => (
+                              <div
+                                key={idx}
+                                className={`rounded-lg border transition p-1.5 ${
+                                  d.isToday
+                                    ? 'bg-purple-50 border-purple-500 font-black text-purple-950 shadow-2xs ring-1 ring-purple-300'
+                                    : 'bg-slate-50 border-slate-200 text-slate-800 font-bold'
+                                }`}
+                              >
+                                <span className="block text-slate-400 text-[9px] font-bold leading-tight">
+                                  {d.label}
+                                </span>
+                                <span className="block font-black text-xs mt-0.5 leading-tight">
+                                  {d.qty}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
               const isCompact = (layoutMode === 'fit' && filteredPopups.length >= 4) || filteredPopups.length >= 6;
 
               return (
@@ -592,8 +1037,6 @@ export const PopupsSalvosView: React.FC<PopupsSalvosViewProps> = ({
                   className={`${
                     layoutMode === 'fit'
                       ? 'w-full min-w-0'
-                      : layoutMode === 'scroll'
-                      ? 'w-[340px] shrink-0'
                       : 'w-full'
                   } bg-white rounded-xl border-2 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col ${
                     popup.isFalta
@@ -749,6 +1192,13 @@ export const PopupsSalvosView: React.FC<PopupsSalvosViewProps> = ({
                               }`}
                             >
                               {v.variacaoCx > 0 ? `+${v.variacaoCx}` : v.variacaoCx} cx
+                            </span>
+                            <span
+                              className={`text-[9.5px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded inline-block mt-0.5 ${
+                                popup.isFalta ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+                              }`}
+                            >
+                              {popup.isFalta ? 'Faltando' : 'Sobrando'}
                             </span>
                           </div>
 

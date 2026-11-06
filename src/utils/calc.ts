@@ -34,6 +34,7 @@ export function calculateProducts(data: RawData): CalcResult {
   const desativadosSet = new Set(data.desativados || []);
 
   const validRes = data.res.filter((x) => {
+    if (x[0] === 6181) return false;
     const desc = String(x[1] || '').trim();
     if (!desc || desc === '' || desc === '01' || /^\d+$/.test(desc)) {
       return false;

@@ -21,7 +21,6 @@ import { DifMensalView } from './components/DifMensalView';
 import { EstoqueCentralView } from './components/EstoqueCentralView';
 import { DashboardView } from './components/DashboardView';
 import { RecontagemView } from './components/RecontagemView';
-import { Contagem021101View } from './components/Contagem021101View';
 import { createRecontagemFromProduct } from './data/defaultRecontagens';
 import { RecontagemItem, ContagemEstoqueItem } from './data/types';
 import { consolidateContagens, getItemDateString, mergeContagemItems } from './utils/contagemUtils';
@@ -36,8 +35,10 @@ import { PasswordModal } from './components/PasswordModal';
 import { EvolucaoDiariaView } from './components/EvolucaoDiariaView';
 import { ProdutosView } from './components/ProdutosView';
 import { PopupsSalvosView } from './components/PopupsSalvosView';
+import { ExportGradeView } from './components/ExportGradeView';
+import { CheckLancamentoGradeView } from './components/CheckLancamentoGradeView';
 
-type TabKey = 'dashboard' | 'popups_salvos' | 'resumo' | 'ajustes' | 'dif_diaria' | 'dif_mensal' | 'ec' | 'recontagem' | 'contagem_021101' | 'produtos';
+type TabKey = 'dashboard' | 'popups_salvos' | 'export_grade' | 'check_grade' | 'resumo' | 'ajustes' | 'dif_diaria' | 'dif_mensal' | 'ec' | 'recontagem' | 'produtos';
 
 const STORAGE_KEY = 'estoque_guarabira_state_v5';
 
@@ -50,7 +51,18 @@ export default function App() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed: RawData = JSON.parse(saved);
+        // Garante a remoção definitiva do produto 6181
+        if (parsed.res) parsed.res = parsed.res.filter((r) => r[0] !== 6181);
+        if (parsed.gradeRes) parsed.gradeRes = parsed.gradeRes.filter((r) => r[0] !== 6181);
+        if (parsed.dia) parsed.dia = parsed.dia.filter((r) => r[0] !== 6181);
+        if (parsed.men) parsed.men = parsed.men.filter((r) => r[0] !== 6181);
+        if (parsed.ec?.r) parsed.ec.r = parsed.ec.r.filter((r) => r[3] !== 6181 && r[0] !== 6181);
+        if (parsed.gradeEc?.r) parsed.gradeEc.r = parsed.gradeEc.r.filter((r) => r[3] !== 6181 && r[0] !== 6181);
+        const desat = new Set(parsed.desativados || []);
+        desat.add(6181);
+        parsed.desativados = Array.from(desat);
+        return parsed;
       } catch (e) {
         console.error('Erro ao ler cache local:', e);
       }
@@ -66,7 +78,8 @@ export default function App() {
   const [savedPopups, setSavedPopups] = useState<SavedPopupItem[]>(() => {
     try {
       const raw = localStorage.getItem('estoque_guarabira_saved_popups');
-      return raw ? JSON.parse(raw) : [];
+      const list: SavedPopupItem[] = raw ? JSON.parse(raw) : [];
+      return list.filter((item) => item.code !== 6181);
     } catch {
       return [];
     }
@@ -1094,6 +1107,32 @@ export default function App() {
         </button>
 
         <button
+          className={activeTab === 'export_grade' ? 'on' : ''}
+          onClick={() => setActiveTab('export_grade')}
+          style={
+            activeTab === 'export_grade'
+              ? { background: '#059669', color: '#FFFFFF', borderColor: '#34D399', fontWeight: '800' }
+              : { background: '#065F46', color: '#D1FAE5', fontWeight: 'bold' }
+          }
+          title="Exportação de Grade: CodigoProduto, CodigoGrade, QuantidadeProduto, QuantidadeReserva com ajustes de 02.05.02, congelamentos e quebras"
+        >
+          EXPORTAR GRADE
+        </button>
+
+        <button
+          className={activeTab === 'check_grade' ? 'on' : ''}
+          onClick={() => setActiveTab('check_grade')}
+          style={
+            activeTab === 'check_grade'
+              ? { background: '#2563EB', color: '#FFFFFF', borderColor: '#60A5FA', fontWeight: '800' }
+              : { background: '#1D4ED8', color: '#DBEAFE', fontWeight: 'bold' }
+          }
+          title="Check de Lançamento da Grade: Valida se o relatório da grade baixado do sistema confere com o planejado"
+        >
+          CHECK LANÇAMENTO
+        </button>
+
+        <button
           className={activeTab === 'resumo' ? 'on' : ''}
           onClick={() => setActiveTab('resumo')}
         >
@@ -1160,34 +1199,6 @@ export default function App() {
               }}
             >
               {data.recontagens?.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          className={activeTab === 'contagem_021101' ? 'on' : ''}
-          onClick={() => setActiveTab('contagem_021101')}
-          style={
-            activeTab === 'contagem_021101'
-              ? { background: '#D97706', color: '#fff', fontWeight: '800' }
-              : { background: '#B45309', color: '#FEF3C7', fontWeight: 'bold' }
-          }
-          title="Aba REC 02 05 02: Recontagem 02.11.01 confrontada com 02.05.02 e calculada com a Tabela 7"
-        >
-          REC 02 05 02
-          {((data.contagem021101?.counts?.length || 1) > 0) && (
-            <span
-              style={{
-                marginLeft: '5px',
-                background: activeTab === 'contagem_021101' ? '#fff' : '#FFC000',
-                color: '#000',
-                borderRadius: '999px',
-                padding: '0 5px',
-                fontSize: '9.5px',
-                fontWeight: 'bold',
-              }}
-            >
-              {data.contagem021101?.counts?.length || 1}
             </span>
           )}
         </button>
@@ -1274,6 +1285,24 @@ export default function App() {
 
 
 
+        {activeTab === 'export_grade' && (
+          <ExportGradeView
+            data={data}
+            calculatedMap={calculatedMap}
+            calculatedProducts={calculatedProducts}
+            onImport020502={(txt, nome) => handleImport020502(txt, nome, 'grade', false)}
+            ecBannerHtml={ecBannerHtml}
+          />
+        )}
+
+        {activeTab === 'check_grade' && (
+          <CheckLancamentoGradeView
+            data={data}
+            calculatedMap={calculatedMap}
+            onNavigateToExportGrade={() => setActiveTab('export_grade')}
+          />
+        )}
+
         {activeTab === 'dashboard' && (
           <DashboardView
             data={data}
@@ -1316,14 +1345,6 @@ export default function App() {
             onClearAll={handleClearAllRecontagens}
             onAplicarAoEstoque={handleAplicarRecontagemAoEstoque}
             onNavigateToDashboard={() => setActiveTab('dashboard')}
-          />
-        )}
-
-        {activeTab === 'contagem_021101' && (
-          <Contagem021101View
-            data={data}
-            onUpdateData={(newData, desc) => updateDataWithHistory(newData, desc)}
-            onNavigateToTab={(tab) => setActiveTab(tab as TabKey)}
           />
         )}
 

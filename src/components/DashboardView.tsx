@@ -2394,6 +2394,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 borderRadius: '7px',
                 padding: '8px 6px',
                 textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
               }}
             >
               <span style={{ display: 'block', fontSize: '10.5px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Variação</span>
@@ -2408,6 +2412,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {hoveredItem.analysis.hoje > hoveredItem.analysis.ontem ? '▲ +' : hoveredItem.analysis.hoje < hoveredItem.analysis.ontem ? '▼ -' : '='}
                 {hoveredItem.analysis.diff} <small style={{ fontSize: '10px', fontWeight: 'normal' }}>cx</small>
               </strong>
+              <span
+                style={{
+                  display: 'inline-block',
+                  fontSize: '10px',
+                  fontWeight: '800',
+                  marginTop: '3px',
+                  padding: '1px 6px',
+                  borderRadius: '4px',
+                  background: hoveredItem.isFalta ? '#fee2e2' : '#dcfce7',
+                  color: hoveredItem.isFalta ? '#b91c1c' : '#15803d',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.02em',
+                }}
+              >
+                {hoveredItem.isFalta ? 'Faltando' : 'Sobrando'}
+              </span>
             </div>
           </div>
 

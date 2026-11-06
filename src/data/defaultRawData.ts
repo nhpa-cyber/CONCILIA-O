@@ -48,5 +48,5 @@ export const initialRawData: RawData = {
   gradeEc: undefined,
   ec0304: undefined,
   recontagens: initialRecontagens,
-  desativados: [],
+  desativados: [6181],
 };
