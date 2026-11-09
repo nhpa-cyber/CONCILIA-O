@@ -431,7 +431,16 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return rawExportRows.filter((r) => {
-      // Filtros rápidos
+      // Se o usuário digitou uma busca específica (por código ou descrição), exibe o item correspondente mesmo se zerado
+      if (q) {
+        const matchesQuery = (r.code + ' ' + r.desc).toLowerCase().includes(q);
+        if (!matchesQuery) return false;
+        if (filterMode === 'both' && !r.hasBoth) return false;
+        if (filterMode === 'adjustments' && !r.hasDiferenca && !r.hasAvaria) return false;
+        return true;
+      }
+
+      // Filtros rápidos quando não há busca por texto
       if (filterMode === 'grade_valid' && r.quantidadeProduto <= 0) {
         return false;
       }
@@ -445,10 +454,6 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
         return false;
       }
 
-      // Busca textual
-      if (q && !(r.code + ' ' + r.desc).toLowerCase().includes(q)) {
-        return false;
-      }
       return true;
     });
   }, [rawExportRows, filterMode, query]);
