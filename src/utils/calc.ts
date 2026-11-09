@@ -128,38 +128,5 @@ export function isCervegela(code: number, desc?: string): boolean {
 }
 
 export function cleanCervegelas(data: RawData): RawData {
-  if (!data) return data;
-  return {
-    ...data,
-    xs: (data.xs || []).filter((c) => !CERVEGELA_CODES.has(c)),
-    res: (data.res || []).filter((r) => !isCervegela(r[0], r[1])),
-    men: (data.men || []).filter((r) => !isCervegela(r[0], r[1])),
-    dia: (data.dia || []).filter((r) => !CERVEGELA_CODES.has(r[0])),
-    aj: {
-      av: (data.aj?.av || []).filter((r) => !isCervegela(Number(r[1]), String(r[2] || ''))),
-      so: (data.aj?.so || []).filter((r) => !isCervegela(Number(r[0]), String(r[1] || ''))),
-      rp: (data.aj?.rp || []).filter((r) => !isCervegela(Number(r[0]), String(r[1] || ''))),
-      fm: (data.aj?.fm || []).filter((r) => !isCervegela(Number(r[0]), String(r[1] || ''))),
-    },
-    ec: data.ec
-      ? {
-          h: data.ec.h,
-          r: (data.ec.r || []).filter((r) => {
-            const cod = Number(r[3]);
-            const desc = String(r[4] || '');
-            return !isCervegela(cod, desc);
-          }),
-        }
-      : data.ec,
-    gradeEc: data.gradeEc
-      ? {
-          h: data.gradeEc.h,
-          r: (data.gradeEc.r || []).filter((r) => {
-            const cod = Number(r[3]);
-            const desc = String(r[4] || '');
-            return !isCervegela(cod, desc);
-          }),
-        }
-      : data.gradeEc,
-  };
+  return data;
 }

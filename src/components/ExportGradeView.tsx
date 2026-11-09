@@ -408,26 +408,37 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
     XLSX.writeFile(wb, `grade_exportacao_${dataStr}.xlsx`);
   };
 
-  // 10. Exportar Arquivo Texto / CSV (Tabulado ou Ponto e Vírgula)
-  const handleExportTxt = (delim: '\t' | ';') => {
-    const header = ['CodigoProduto', 'CodigoGrade', 'QuantidadeProduto', 'QuantidadeReserva'].join(delim);
+  // 10. Exportar Arquivo CSV Oficial Promax exatamente no formato importacaoGrade.csv (separado por ;)
+  const handleExportImportacaoGradeCsv = () => {
+    const header = 'CodigoProduto;CodigoGrade;QuantidadeProduto;QuantidadeReserva';
     const body = sortedRows
-      .map((r) => [r.code, r.codigoGrade, r.quantidadeProduto, r.quantidadeReserva].join(delim))
+      .map((r) => `${r.code};${r.codigoGrade};${r.quantidadeProduto};${r.quantidadeReserva}`)
       .join('\r\n');
-    const content = '\ufeff' + header + '\r\n' + body;
+    const content = `${header}\r\n${body}\r\n`;
 
-    const ext = delim === '\t' ? 'txt' : 'csv';
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `grade_exportacao_${new Date().toISOString().slice(0, 10)}.${ext}`;
+    link.download = 'importacaoGrade.csv';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
+  // 11. Copiar no formato oficial Promax com ponto e vírgula (;)
+  const handleCopyPromaxCsv = () => {
+    const header = 'CodigoProduto;CodigoGrade;QuantidadeProduto;QuantidadeReserva';
+    const body = sortedRows
+      .map((r) => `${r.code};${r.codigoGrade};${r.quantidadeProduto};${r.quantidadeReserva}`)
+      .join('\r\n');
+    const csv = `${header}\r\n${body}\r\n`;
+
+    navigator.clipboard.writeText(csv);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
 
   return (
     <section className="w-full flex flex-col p-4 md:p-6 bg-slate-50 min-h-screen">
@@ -450,46 +461,59 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
               <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-purple-600 text-white">
                 Ajustes Automáticos: Congelamentos + Quebras/Avarias
               </span>
+              <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-amber-500 text-slate-950">
+                Padrão Promax: importacaoGrade.csv (;)
+              </span>
             </div>
             <p className="text-xs text-slate-300">
-              Gera a exportação oficial com as colunas <strong className="text-amber-300">CodigoProduto</strong>, <strong className="text-amber-300">CodigoGrade</strong>, <strong className="text-amber-300">QuantidadeProduto</strong> e <strong className="text-amber-300">QuantidadeReserva</strong> prontas para o sistema de carregamento e faturamento.
+              Gera a exportação oficial com as colunas <strong className="text-amber-300">CodigoProduto;CodigoGrade;QuantidadeProduto;QuantidadeReserva</strong> no arquivo oficial <strong className="text-emerald-400">importacaoGrade.csv</strong> pronto para carregamento e faturamento no Promax.
             </p>
           </div>
 
-          {/* BOTÕES DE AÇÃO: COPIAR E BAIXAR */}
+          {/* BOTÕES DE AÇÃO: EXPORTAR CSV PROMAX, COPIAR E EXCEL */}
           <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
-              onClick={handleCopyOficial}
-              className={`inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg shadow transition ${
+              onClick={handleExportImportacaoGradeCsv}
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-md transition transform hover:-translate-y-0.5"
+              title="Baixar arquivo oficial importacaoGrade.csv com delimitador ponto e vírgula (;)"
+            >
+              <Download size={15} />
+              <span>BAIXAR CSV (importacaoGrade.csv)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyPromaxCsv}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg shadow transition ${
                 copied
                   ? 'bg-emerald-500 text-white'
                   : 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black'
               }`}
-              title="Copiar dados tabulados para colar no Excel ou Promax"
+              title="Copiar no formato oficial Promax com delimitador ponto e vírgula (;)"
             >
               {copied ? <Check size={15} /> : <Copy size={15} />}
-              <span>{copied ? 'TABELA COPIADA!' : 'COPIAR TABELA'}</span>
+              <span>{copied ? 'CSV COPIADO!' : 'COPIAR CSV ( ; )'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyOficial}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition"
+              title="Copiar com tabulação (TAB) para colar no Excel"
+            >
+              <Copy size={14} />
+              <span>COPIAR TAB</span>
             </button>
 
             <button
               type="button"
               onClick={handleExportExcel}
-              className="inline-flex items-center gap-2 px-3.5 py-2 bg-green-700 hover:bg-green-600 text-white text-xs font-bold rounded-lg shadow transition"
-              title="Baixar planilha Excel (.xlsx) formatada com as 4 colunas"
-            >
-              <FileSpreadsheet size={15} />
-              <span>BAIXAR EXCEL (.XLSX)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleExportTxt('\t')}
               className="inline-flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition"
-              title="Baixar arquivo de texto tabulado (.txt)"
+              title="Baixar planilha Excel (.xlsx)"
             >
-              <Download size={14} />
-              <span>TXT / CSV</span>
+              <FileSpreadsheet size={14} />
+              <span>EXCEL (.XLSX)</span>
             </button>
           </div>
         </div>

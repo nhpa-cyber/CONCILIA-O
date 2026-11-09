@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { RawData, ResRow, DiaRow } from '../data/types';
-import { calculateProducts, sum, isCervegela } from './calc';
+import { calculateProducts, sum } from './calc';
 import { Rt } from './formatters';
 
 export interface Import020502Result {
@@ -361,14 +361,12 @@ export function process020502(
     if (it <= ip) it = ip + 2;
   }
 
-  // Filtra linhas com código de produto válido e remove todas as cervegelas
+  // Filtra linhas com código de produto válido
   body = body.filter((r) => {
     if (!r || r.length <= ip) return false;
     const codeStr = String(r[ip] || '').trim().replace(/^0+/, '');
     const codeNum = Number(codeStr);
     if (isNaN(codeNum) || codeNum <= 0 || codeNum >= 99999999) return false;
-    const desc = id >= 0 && r[id] ? String(r[id]) : '';
-    if (isCervegela(codeNum, desc)) return false;
     return true;
   });
 

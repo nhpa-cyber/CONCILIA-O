@@ -5,8 +5,8 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RawData, ResRow, AjustesData, MenRow, DiaRow, DashboardSnapshot, EstoqueCentralData, SavedPopupItem } from './data/types';
-import { initialRawData } from './data/defaultRawData';
-import { calculateProducts } from './utils/calc';
+import { initialRawData, cervegelasRes, cervegelasMen } from './data/defaultRawData';
+import { calculateProducts, CERVEGELA_CODES } from './utils/calc';
 import { saveStateToFirestore, loadStateFromFirestore, logActionToFirestore, subscribeToState } from './firebase';
 import { process020502, parseColL } from './utils/importer020502';
 import { process020304 } from './utils/importer020304';
@@ -59,9 +59,31 @@ export default function App() {
         if (parsed.men) parsed.men = parsed.men.filter((r) => r[0] !== 6181);
         if (parsed.ec?.r) parsed.ec.r = parsed.ec.r.filter((r) => r[3] !== 6181 && r[0] !== 6181);
         if (parsed.gradeEc?.r) parsed.gradeEc.r = parsed.gradeEc.r.filter((r) => r[3] !== 6181 && r[0] !== 6181);
+
+        // Garante que as cervegelas estejam ativas e presentes na plataforma
         const desat = new Set(parsed.desativados || []);
         desat.add(6181);
+        CERVEGELA_CODES.forEach((c) => desat.delete(c));
         parsed.desativados = Array.from(desat);
+
+        if (Array.isArray(parsed.res)) {
+          const resCodes = new Set(parsed.res.map((r) => r[0]));
+          cervegelasRes.forEach((cRow) => {
+            if (!resCodes.has(cRow[0])) {
+              parsed.res.push([...cRow]);
+            }
+          });
+        }
+
+        if (Array.isArray(parsed.men)) {
+          const menCodes = new Set(parsed.men.map((r) => r[0]));
+          cervegelasMen.forEach((mRow) => {
+            if (!menCodes.has(mRow[0])) {
+              parsed.men.push([...mRow]);
+            }
+          });
+        }
+
         return parsed;
       } catch (e) {
         console.error('Erro ao ler cache local:', e);

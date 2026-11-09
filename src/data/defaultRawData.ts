@@ -6,9 +6,25 @@ import { men_a } from './part4_men_a';
 import { men_b } from './part4_men_b';
 import { ec } from './part5_ec';
 import { initialRecontagens } from './defaultRecontagens';
-import { RawData, MenRow } from './types';
+import { RawData, MenRow, ResRow } from './types';
 
-const rawRes = [...res_a, ...res_b];
+export const cervegelasRes: ResRow[] = [
+  [23671, "CERVEGELA BRAHMA 600ML", "un", 0, 1, 15.00, 0.001, 0, 0, 0, 0, 0],
+  [23672, "CERVEGELA SKOL 600ML", "un", 0, 1, 15.00, 0.001, 0, 0, 0, 0, 0],
+  [29416, "CERVEGELA BUDWEISER 600ML", "un", 0, 1, 18.00, 0.001, 0, 0, 0, 0, 0],
+  [29418, "CERVEGELA ANTARCTICA 600ML", "un", 0, 1, 15.00, 0.001, 0, 0, 0, 0, 0],
+  [35108, "CERVEGELA SPATEN 600ML", "un", 0, 1, 20.00, 0.001, 0, 0, 0, 0, 0],
+];
+
+export const cervegelasMen: MenRow[] = [
+  [23671, "CERVEGELA BRAHMA 600ML", 0.001, 0, Array(31).fill(null), 0],
+  [23672, "CERVEGELA SKOL 600ML", 0.001, 0, Array(31).fill(null), 0],
+  [29416, "CERVEGELA BUDWEISER 600ML", 0.001, 0, Array(31).fill(null), 0],
+  [29418, "CERVEGELA ANTARCTICA 600ML", 0.001, 0, Array(31).fill(null), 0],
+  [35108, "CERVEGELA SPATEN 600ML", 0.001, 0, Array(31).fill(null), 0],
+];
+
+const rawRes = [...res_a, ...res_b, ...cervegelasRes];
 const zeroedRes = rawRes.map((r) => {
   const row = [...r] as typeof r;
   row[7] = row[3]; // contagem física b igual ao disponível Promax G para zerar divergência
@@ -21,7 +37,7 @@ rawDia.forEach(([c, eq, gq]) => {
   rawDiaMap.set(c, { eq, gq });
 });
 
-const seededMen: MenRow[] = [...men_a, ...men_b].map((row) => {
+const seededMen: MenRow[] = [...men_a, ...men_b, ...cervegelasMen].map((row) => {
   const r = [...row] as typeof row;
   const days = [...r[4]];
   const diaEntry = rawDiaMap.get(r[0]);
