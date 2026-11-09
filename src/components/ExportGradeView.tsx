@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { RawData, CalculatedProduct, ResRow } from '../data/types';
+import { RawData, CalculatedProduct } from '../data/types';
 import { parseColL } from '../utils/importer020502';
 import { PERMANENT_GRADE_ITEMS } from '../utils/gradeCalculations';
 import { 
@@ -9,7 +9,12 @@ import {
   Check, 
   Download, 
   FileSpreadsheet, 
-  ArrowUpDown
+  ArrowUpDown,
+  Filter,
+  CheckCircle2,
+  AlertTriangle,
+  Flame,
+  Layers
 } from 'lucide-react';
 
 interface ExportGradeViewProps {
@@ -20,7 +25,7 @@ interface ExportGradeViewProps {
   ecBannerHtml?: string | null;
 }
 
-interface GradeExportRow {
+export interface GradeExportRow {
   code: number;
   desc: string;
   disp020502: number;
@@ -31,6 +36,10 @@ interface GradeExportRow {
   quantidadeReserva: number;
   has020502: boolean;
   isPermanente?: boolean;
+  hasDiferenca: boolean;
+  hasAvaria: boolean;
+  hasBoth: boolean;
+  isZero: boolean;
 }
 
 export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
@@ -42,6 +51,7 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
 }) => {
   const [query, setQuery] = useState('');
   const [viewMode, setViewMode] = useState<'oficial' | 'detalhado'>('oficial');
+  const [filterMode, setFilterMode] = useState<'grade_valid' | 'all' | 'adjustments' | 'both' | 'zero'>('grade_valid');
   const [codigoGradePadrao, setCodigoGradePadrao] = useState<number>(1);
   const [quantidadeReservaPadrao, setQuantidadeReservaPadrao] = useState<number>(0);
   const [copied, setCopied] = useState(false);
@@ -59,9 +69,9 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
     return null;
   }, [data.gradeEc, data.ec]);
 
-  // 2. Mapeamento da Coluna L (Disponível Fiscal) da 02.05.02
+  // 2. Mapeamento da Coluna L (Disponível Fiscal) e Colunas da 02.05.02
   const ecMap = useMemo(() => {
-    const map: Record<number, { disp: number; desc?: string }> = {};
+    const map: Record<number, { disp: number; desc?: string; dif020502?: number }> = {};
     if (!ecSource || !Array.isArray(ecSource.r)) return map;
 
     const headers = (ecSource.h || []).map((h) =>
@@ -116,8 +126,17 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
         dispVal = parseColL(row[11]);
       }
 
+      // Lê diferença diretamente da Coluna N (13) ou Coluna O (14) se existir
+      let dif020502 = 0;
+      if (row.length > 13 && row[13] !== undefined && row[13] !== '') {
+        dif020502 = parseColL(row[13]);
+      }
+      if (dif020502 === 0 && row.length > 14 && row[14] !== undefined && row[14] !== '') {
+        dif020502 = parseColL(row[14]);
+      }
+
       const desc = (row[dIdx] && String(row[dIdx]).trim()) || `PRODUTO ${code}`;
-      map[code] = { disp: dispVal, desc };
+      map[code] = { disp: dispVal, desc, dif020502 };
     });
 
     return map;
@@ -152,7 +171,7 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
     return map;
   }, [data.aj, data.res]);
 
-  // 4. Mapeamento dos Ajustes de Congelamento / Diferença Diária (data.dia / data.men / calc.R)
+  // 4. Mapeamento dos Ajustes de Diferença (data.dia / 02.05.02 / data.men / calc.R)
   const diferencasMap = useMemo(() => {
     const map: Record<number, number> = {};
 
@@ -167,7 +186,34 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
       });
     }
 
-    // Prioridade 2: data.men (DIF Mensal - busca último dia preenchido)
+    // Prioridade 2: Diferença vinda da própria 02.05.02 (Coluna N / índice 13 ou Coluna O / índice 14)
+    if (ecSource && Array.isArray(ecSource.r)) {
+      ecSource.r.forEach((r) => {
+        let code = 0;
+        for (const c of [3, 0, 1, 2]) {
+          const v = String(r[c] || '').trim().replace(/^0+/, '');
+          const n = Number(v);
+          if (!isNaN(n) && n > 10 && n < 99999999) {
+            code = n;
+            break;
+          }
+        }
+        if (code > 0 && map[code] === undefined) {
+          let colNDif = 0;
+          if (r.length > 13 && r[13] !== undefined && r[13] !== '') {
+            colNDif = parseColL(r[13]);
+          }
+          if (colNDif === 0 && r.length > 14 && r[14] !== undefined && r[14] !== '') {
+            colNDif = parseColL(r[14]);
+          }
+          if (colNDif !== 0) {
+            map[code] = colNDif;
+          }
+        }
+      });
+    }
+
+    // Prioridade 3: data.men (DIF Mensal - busca último dia preenchido)
     if (Array.isArray(data.men)) {
       data.men.forEach((row) => {
         const code = row[0];
@@ -189,7 +235,7 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
       });
     }
 
-    // Prioridade 3: calculatedMap[code].R (diferença atual apurada)
+    // Prioridade 4: calculatedMap[code].R (diferença atual apurada no Resumo)
     if (calculatedMap) {
       Object.entries(calculatedMap).forEach(([cStr, calc]) => {
         const code = Number(cStr);
@@ -200,15 +246,15 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
     }
 
     return map;
-  }, [data.dia, data.men, calculatedMap]);
+  }, [data.dia, data.men, calculatedMap, ecSource]);
 
-  // 5. Linhas calculadas da Grade de Exportação
+  // 5. Linhas calculadas da Grade de Exportação (Todos os produtos da 02.05.02 preservados)
   const rawExportRows = useMemo<GradeExportRow[]>(() => {
     const rows: GradeExportRow[] = [];
     const seenCodes = new Set<number>();
     const desativadosSet = new Set(data.desativados || []);
 
-    // Se temos 02.05.02 importada, percorre os produtos da 02.05.02
+    // Se temos 02.05.02 importada, percorre todos os produtos da 02.05.02
     if (ecSource && Array.isArray(ecSource.r) && ecSource.r.length > 0) {
       ecSource.r.forEach((row) => {
         let code = 0;
@@ -230,7 +276,7 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
         const desc = ecItem?.desc || calc?.d || resRow?.[1] || `PRODUTO ${code}`;
         const disp020502 = ecItem ? Math.round(ecItem.disp) : Math.round(row.length > 11 ? parseColL(row[11]) : 0);
 
-        // Ajuste Diferença Diária / Congelamento (Sobra soma, Falta reduz)
+        // Ajuste Diferença Diária / Congelamento / 02.05.02 (Sobra soma, Falta reduz)
         const ajusteDiferenca = Math.round(diferencasMap[code] || 0);
 
         // Ajuste de Avarias / Quebras em caixas (reduz a quantidade que pode ir para a grade)
@@ -240,10 +286,14 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
 
         // Se for permanente, fixa a quantidade permanente solicitada (ex: 20 cx)
         const perm = PERMANENT_GRADE_ITEMS[code];
-        const quantidadeProduto = perm ? perm.qty : Math.max(0, Math.round(disp020502 + ajusteDiferenca - ajusteAvarias));
+        const quantidadeProduto = perm 
+          ? perm.qty 
+          : Math.max(0, Math.round(disp020502 + ajusteDiferenca - ajusteAvarias));
 
-        // Regra do sistema Promax: Não exportar produtos com quantidade 0 (sistema rejeita)
-        if (quantidadeProduto <= 0) return;
+        const hasDiferenca = ajusteDiferenca !== 0;
+        const hasAvaria = ajusteAvarias !== 0;
+        const hasBoth = hasDiferenca && hasAvaria;
+        const isZero = quantidadeProduto <= 0;
 
         rows.push({
           code,
@@ -256,6 +306,10 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
           quantidadeReserva: quantidadeReservaPadrao,
           has020502: true,
           isPermanente: !!perm,
+          hasDiferenca,
+          hasAvaria,
+          hasBoth,
+          isZero,
         });
       });
     } else {
@@ -275,10 +329,14 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
         const ajusteAvarias = Math.round(totalAvariasUnid / (fatorCx > 0 ? fatorCx : 1));
 
         const perm = PERMANENT_GRADE_ITEMS[code];
-        const quantidadeProduto = perm ? perm.qty : Math.max(0, Math.round(disp020502 + ajusteDiferenca - ajusteAvarias));
+        const quantidadeProduto = perm 
+          ? perm.qty 
+          : Math.max(0, Math.round(disp020502 + ajusteDiferenca - ajusteAvarias));
 
-        // Regra do sistema Promax: Não exportar produtos com quantidade 0 (sistema rejeita)
-        if (quantidadeProduto <= 0) return;
+        const hasDiferenca = ajusteDiferenca !== 0;
+        const hasAvaria = ajusteAvarias !== 0;
+        const hasBoth = hasDiferenca && hasAvaria;
+        const isZero = quantidadeProduto <= 0;
 
         rows.push({
           code,
@@ -291,6 +349,10 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
           quantidadeReserva: quantidadeReservaPadrao,
           has020502: false,
           isPermanente: !!perm,
+          hasDiferenca,
+          hasAvaria,
+          hasBoth,
+          isZero,
         });
       });
     }
@@ -316,6 +378,10 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
           quantidadeReserva: quantidadeReservaPadrao,
           has020502: !!ecMap[code],
           isPermanente: true,
+          hasDiferenca: false,
+          hasAvaria: false,
+          hasBoth: false,
+          isZero: false,
         });
       }
     });
@@ -333,22 +399,61 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
     quantidadeReservaPadrao,
   ]);
 
-  // 6. Filtragem e Busca
+  // 6. KPIs de Auditoria e Resumo Geral
+  const summaryKpis = useMemo(() => {
+    const validRows = rawExportRows.filter((r) => r.quantidadeProduto > 0);
+    const totalCaixasGrade = validRows.reduce((acc, r) => acc + r.quantidadeProduto, 0);
+    const totalDisp020502 = rawExportRows.reduce((acc, r) => acc + r.disp020502, 0);
+    const difRows = rawExportRows.filter((r) => r.hasDiferenca);
+    const totalAjusteDiferenca = rawExportRows.reduce((acc, r) => acc + r.ajusteDiferenca, 0);
+    const avariaRows = rawExportRows.filter((r) => r.hasAvaria);
+    const totalAjusteAvarias = rawExportRows.reduce((acc, r) => acc + r.ajusteAvarias, 0);
+    const bothRows = rawExportRows.filter((r) => r.hasBoth);
+    const zeroRows = rawExportRows.filter((r) => r.isZero);
+    const permRows = rawExportRows.filter((r) => r.isPermanente);
+
+    return {
+      totalEc: rawExportRows.length,
+      validGradeCount: validRows.length,
+      totalCaixasGrade,
+      totalDisp020502,
+      difItemsCount: difRows.length,
+      totalAjusteDiferenca,
+      avariaItemsCount: avariaRows.length,
+      totalAjusteAvarias,
+      bothCount: bothRows.length,
+      zeroCount: zeroRows.length,
+      permCount: permRows.length,
+    };
+  }, [rawExportRows]);
+
+  // 7. Filtragem e Busca
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return rawExportRows.filter((r) => {
-      // Regra obrigatória do sistema: não aceita produto com quantidade 0 sendo lançado
-      if (r.quantidadeProduto <= 0) {
+      // Filtros rápidos
+      if (filterMode === 'grade_valid' && r.quantidadeProduto <= 0) {
         return false;
       }
+      if (filterMode === 'adjustments' && !r.hasDiferenca && !r.hasAvaria) {
+        return false;
+      }
+      if (filterMode === 'both' && !r.hasBoth) {
+        return false;
+      }
+      if (filterMode === 'zero' && r.quantidadeProduto > 0) {
+        return false;
+      }
+
+      // Busca textual
       if (q && !(r.code + ' ' + r.desc).toLowerCase().includes(q)) {
         return false;
       }
       return true;
     });
-  }, [rawExportRows, query]);
+  }, [rawExportRows, filterMode, query]);
 
-  // 7. Ordenação
+  // 8. Ordenação
   const sortedRows = useMemo(() => {
     return [...filteredRows].sort((a, b) => {
       let vA: any = a[sortField];
@@ -372,10 +477,17 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
     }
   };
 
-  // 8. Copiar Tabela Exatamente com as 4 Colunas (TSV para colar em Excel/Promax)
+  // Linhas válidas para faturamento e carregamento no Promax (Promax rejeita se houver QuantidadeProduto === 0)
+  const promaxExportableRows = useMemo(() => {
+    return rawExportRows
+      .filter((r) => r.quantidadeProduto > 0)
+      .sort((a, b) => a.code - b.code);
+  }, [rawExportRows]);
+
+  // 9. Copiar Tabela Exatamente com as 4 Colunas (TSV para colar em Excel/Promax)
   const handleCopyOficial = () => {
     const header = ['CodigoProduto', 'CodigoGrade', 'QuantidadeProduto', 'QuantidadeReserva'].join('\t');
-    const body = sortedRows
+    const body = promaxExportableRows
       .map((r) => `${r.code}\t${r.codigoGrade}\t${r.quantidadeProduto}\t${r.quantidadeReserva}`)
       .join('\r\n');
     const tsv = `${header}\r\n${body}`;
@@ -385,17 +497,16 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
     setTimeout(() => setCopied(false), 2500);
   };
 
-  // 9. Exportar Arquivo Excel (.xlsx) Oficial com 4 Colunas
+  // 10. Exportar Arquivo Excel (.xlsx) Oficial com 4 Colunas
   const handleExportExcel = () => {
     const wsData = [
       ['CodigoProduto', 'CodigoGrade', 'QuantidadeProduto', 'QuantidadeReserva'],
-      ...sortedRows.map((r) => [r.code, r.codigoGrade, r.quantidadeProduto, r.quantidadeReserva]),
+      ...promaxExportableRows.map((r) => [r.code, r.codigoGrade, r.quantidadeProduto, r.quantidadeReserva]),
     ];
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-    // Ajusta larguras de colunas
     ws['!cols'] = [
       { wch: 16 }, // CodigoProduto
       { wch: 14 }, // CodigoGrade
@@ -408,10 +519,10 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
     XLSX.writeFile(wb, `grade_exportacao_${dataStr}.xlsx`);
   };
 
-  // 10. Exportar Arquivo CSV Oficial Promax exatamente no formato importacaoGrade.csv (separado por ;)
+  // 11. Exportar Arquivo CSV Oficial Promax exatamente no formato importacaoGrade.csv (separado por ;)
   const handleExportImportacaoGradeCsv = () => {
     const header = 'CodigoProduto;CodigoGrade;QuantidadeProduto;QuantidadeReserva';
-    const body = sortedRows
+    const body = promaxExportableRows
       .map((r) => `${r.code};${r.codigoGrade};${r.quantidadeProduto};${r.quantidadeReserva}`)
       .join('\r\n');
     const content = `${header}\r\n${body}\r\n`;
@@ -427,10 +538,10 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  // 11. Copiar no formato oficial Promax com ponto e vírgula (;)
+  // 12. Copiar no formato oficial Promax com ponto e vírgula (;)
   const handleCopyPromaxCsv = () => {
     const header = 'CodigoProduto;CodigoGrade;QuantidadeProduto;QuantidadeReserva';
-    const body = sortedRows
+    const body = promaxExportableRows
       .map((r) => `${r.code};${r.codigoGrade};${r.quantidadeProduto};${r.quantidadeReserva}`)
       .join('\r\n');
     const csv = `${header}\r\n${body}\r\n`;
@@ -443,7 +554,7 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
   return (
     <section className="w-full flex flex-col p-4 md:p-6 bg-slate-50 min-h-screen">
       {/* CABEÇALHO PRINCIPAL */}
-      <div className="bg-slate-900 text-white rounded-xl shadow-md p-5 mb-5 border border-slate-800">
+      <div className="bg-slate-900 text-white rounded-xl shadow-md p-5 mb-4 border border-slate-800">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -519,7 +630,7 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
         </div>
       </div>
 
-      {/* FEEDBACK BANNER SE HOUVER */}
+      {/* FEEDBACK BANNER DA IMPORTAÇÃO 02.05.02 */}
       {ecBannerHtml && (
         <div
           className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg text-xs"
@@ -527,9 +638,106 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
         />
       )}
 
-      {/* BARRA DE FERRAMENTAS, FILTROS E MODO DE VISUALIZAÇÃO */}
+      {/* CARDS KPIS DE AUDITORIA COMPLETA (CONFIRMAÇÃO DOS PRODUTOS DA 02.05.02, DIFERENÇAS E QUEBRAS) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+        {/* PRODUTOS NA GRADE */}
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+            PRODUTOS NA GRADE
+          </span>
+          <div className="my-1 flex items-baseline gap-1.5">
+            <span className="text-2xl font-black text-slate-900">{summaryKpis.validGradeCount}</span>
+            <span className="text-xs text-slate-400 font-semibold">itens</span>
+          </div>
+          <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
+            <CheckCircle2 size={12} /> Saldo &gt; 0 para carga
+          </span>
+        </div>
+
+        {/* TOTAL CAIXAS GRADE */}
+        <div className="bg-white p-3.5 rounded-xl border border-amber-200 bg-amber-50/20 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-black uppercase tracking-wider text-amber-900">
+            TOTAL CAIXAS GRADE
+          </span>
+          <div className="my-1 flex items-baseline gap-1.5">
+            <span className="text-2xl font-black text-amber-900">
+              {summaryKpis.totalCaixasGrade.toLocaleString('pt-BR')}
+            </span>
+            <span className="text-xs text-amber-700 font-bold">cx</span>
+          </div>
+          <span className="text-[11px] text-amber-700 font-semibold">
+            Quantidade total carga Promax
+          </span>
+        </div>
+
+        {/* DISPONÍVEL 02.05.02 */}
+        <div className="bg-white p-3.5 rounded-xl border border-blue-200 bg-blue-50/20 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-black uppercase tracking-wider text-blue-900">
+            DISPONÍVEL 02.05.02
+          </span>
+          <div className="my-1 flex items-baseline gap-1.5">
+            <span className="text-2xl font-black text-blue-900">
+              {summaryKpis.totalDisp020502.toLocaleString('pt-BR')}
+            </span>
+            <span className="text-xs text-blue-700 font-bold">cx</span>
+          </div>
+          <span className="text-[11px] text-blue-700 font-semibold">
+            Base fiscal (Coluna L: {summaryKpis.totalEc} itens)
+          </span>
+        </div>
+
+        {/* AJUSTE DIF DIÁRIA / CONGELADA */}
+        <div className="bg-white p-3.5 rounded-xl border border-purple-200 bg-purple-50/20 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-black uppercase tracking-wider text-purple-900">
+            AJUSTE DIF DIÁRIA
+          </span>
+          <div className="my-1 flex items-baseline gap-1.5">
+            <span className={`text-2xl font-black ${summaryKpis.totalAjusteDiferenca < 0 ? 'text-red-700' : 'text-purple-900'}`}>
+              {summaryKpis.totalAjusteDiferenca > 0 ? `+${summaryKpis.totalAjusteDiferenca}` : summaryKpis.totalAjusteDiferenca}
+            </span>
+            <span className="text-xs text-purple-700 font-bold">cx</span>
+          </div>
+          <span className="text-[11px] text-purple-700 font-semibold">
+            {summaryKpis.difItemsCount} itens com divergência
+          </span>
+        </div>
+
+        {/* AVARIAS / QUEBRAS */}
+        <div className="bg-white p-3.5 rounded-xl border border-rose-200 bg-rose-50/20 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-black uppercase tracking-wider text-rose-900">
+            AVARIAS / QUEBRAS
+          </span>
+          <div className="my-1 flex items-baseline gap-1.5">
+            <span className="text-2xl font-black text-rose-700">
+              -{summaryKpis.totalAjusteAvarias}
+            </span>
+            <span className="text-xs text-rose-700 font-bold">cx</span>
+          </div>
+          <span className="text-[11px] text-rose-700 font-semibold">
+            {summaryKpis.avariaItemsCount} itens com quebra abatida
+          </span>
+        </div>
+
+        {/* ITENS COM DIFERENÇA + QUEBRAS */}
+        <div className="bg-white p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/20 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-black uppercase tracking-wider text-indigo-900">
+            DIF + QUEBRAS
+          </span>
+          <div className="my-1 flex items-baseline gap-1.5">
+            <span className="text-2xl font-black text-indigo-900">
+              {summaryKpis.bothCount}
+            </span>
+            <span className="text-xs text-indigo-700 font-bold">itens</span>
+          </div>
+          <span className="text-[11px] text-indigo-700 font-semibold">
+            Com ambos os ajustes aplicados
+          </span>
+        </div>
+      </div>
+
+      {/* BARRA DE FERRAMENTAS, FILTROS RÁPIDOS E MODO DE VISUALIZAÇÃO */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Campo de Busca */}
           <div className="relative flex-1 max-w-md">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -537,7 +745,7 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por código ou descrição do produto..."
+              placeholder="Buscar código ou descrição do produto..."
               className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white"
             />
             {query && (
@@ -551,9 +759,81 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
             )}
           </div>
 
-          {/* Filtros e Alternadores */}
+          {/* Filtros Rápidos por Categoria de Ajuste */}
+          <div className="flex items-center gap-1.5 flex-wrap text-xs">
+            <span className="text-slate-400 font-semibold text-[11px] mr-1 flex items-center gap-1">
+              <Filter size={12} /> Filtro:
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setFilterMode('grade_valid')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 ${
+                filterMode === 'grade_valid'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+              title="Exibir produtos com quantidade positiva prontos para exportar"
+            >
+              <span>✓ Na Grade ({summaryKpis.validGradeCount})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFilterMode('all')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 ${
+                filterMode === 'all'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+              title="Exibir todos os produtos do relatório 02.05.02 (inclusive zerados)"
+            >
+              <span>Todos da 02.05.02 ({summaryKpis.totalEc})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFilterMode('both')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 ${
+                filterMode === 'both'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+              title="Filtrar apenas produtos que possuem AMBOS: DIF Diária E Quebras/Avarias"
+            >
+              <Flame size={12} />
+              <span>DIF + Quebras ({summaryKpis.bothCount})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFilterMode('adjustments')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 ${
+                filterMode === 'adjustments'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+              title="Filtrar produtos com qualquer ajuste (DIF diária ou quebras)"
+            >
+              <span>Com Ajustes ({summaryKpis.difItemsCount + summaryKpis.avariaItemsCount - summaryKpis.bothCount})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFilterMode('zero')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 ${
+                filterMode === 'zero'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+              title="Produtos com saldo zerado (omitidos da exportação Promax)"
+            >
+              <span>Zerados ({summaryKpis.zeroCount})</span>
+            </button>
+          </div>
+
+          {/* Alternador de Modo e Parâmetros */}
           <div className="flex items-center gap-3 flex-wrap text-xs">
-            {/* Alternador de Modo */}
             <div className="inline-flex p-1 bg-slate-100 rounded-lg border border-slate-200">
               <button
                 type="button"
@@ -581,7 +861,6 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
               </button>
             </div>
 
-            {/* Configuração de CodigoGrade e QuantidadeReserva */}
             <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
               <label className="text-[11px] text-slate-500 font-semibold flex items-center gap-1">
                 <span>Cód. Grade:</span>
@@ -609,7 +888,7 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
 
       {/* ÁREA DA TABELA: PADRÃO OU MEMÓRIA DE CÁLCULO */}
       <div className="bg-white rounded-xl border border-slate-300 shadow overflow-hidden flex-1">
-        <div className="overflow-x-auto max-h-[calc(100vh-330px)]">
+        <div className="overflow-x-auto max-h-[calc(100vh-340px)]">
           {viewMode === 'oficial' ? (
             /* TABELA OFICIAL EXATAMENTE CONFORME A IMAGEM ANEXADA:
                CodigoProduto | CodigoGrade | QuantidadeProduto | QuantidadeReserva */
@@ -655,7 +934,9 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
                   sortedRows.map((row) => (
                     <tr
                       key={row.code}
-                      className="hover:bg-amber-50/70 transition-colors"
+                      className={`hover:bg-amber-50/70 transition-colors ${
+                        row.isZero ? 'bg-slate-50 text-slate-400' : ''
+                      }`}
                     >
                       {/* CodigoProduto */}
                       <td className="py-2.5 px-4 font-mono font-bold text-slate-900 border-r border-slate-100">
@@ -664,6 +945,16 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
                           {row.isPermanente && (
                             <span className="px-1.5 py-0.5 text-[9px] font-black bg-purple-100 text-purple-800 rounded border border-purple-300" title="Quantidade permanente fixada na grade (20 cx)">
                               FIXA
+                            </span>
+                          )}
+                          {row.hasBoth && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-black bg-indigo-100 text-indigo-800 rounded border border-indigo-200" title={`DIF: ${row.ajusteDiferenca > 0 ? '+' : ''}${row.ajusteDiferenca} cx | Quebra: -${row.ajusteAvarias} cx`}>
+                              DIF+QUEBRA
+                            </span>
+                          )}
+                          {row.isZero && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-bold bg-slate-200 text-slate-600 rounded">
+                              ZERADO
                             </span>
                           )}
                         </div>
@@ -675,8 +966,10 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
                       </td>
 
                       {/* QuantidadeProduto */}
-                      <td className="py-2.5 px-4 font-mono font-bold text-slate-900 border-r border-slate-100">
-                        {row.quantidadeProduto}
+                      <td className="py-2.5 px-4 font-mono font-bold border-r border-slate-100">
+                        <span className={row.isZero ? 'text-slate-400' : 'text-slate-900'}>
+                          {row.quantidadeProduto}
+                        </span>
                       </td>
 
                       {/* QuantidadeReserva */}
@@ -708,7 +1001,7 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
                   <th className="py-3 px-3 border-r border-amber-300 text-center" title="Disponível fiscal da Coluna L">
                     Disp. 02.05.02 (L)
                   </th>
-                  <th className="py-3 px-3 border-r border-amber-300 text-center" title="Ajuste de congelamento / DIF diária">
+                  <th className="py-3 px-3 border-r border-amber-300 text-center" title="Ajuste de congelamento / DIF diária / 02.05.02">
                     Ajuste DIF Diária
                   </th>
                   <th className="py-3 px-3 border-r border-amber-300 text-center" title="Quebras e avarias abatidas">
@@ -724,15 +1017,18 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
                   <th className="py-3 px-3 border-r border-amber-300 text-center">
                     Cód. Grade
                   </th>
-                  <th className="py-3 px-3 text-center">
+                  <th className="py-3 px-3 border-r border-amber-300 text-center">
                     Reserva
+                  </th>
+                  <th className="py-3 px-3 text-center">
+                    Auditoria de Ajustes
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-xs">
                 {sortedRows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400">
+                    <td colSpan={9} className="py-12 text-center text-slate-400">
                       Nenhum produto encontrado com os filtros aplicados.
                     </td>
                   </tr>
@@ -740,7 +1036,9 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
                   sortedRows.map((row) => (
                     <tr
                       key={row.code}
-                      className="hover:bg-amber-50/70 transition-colors"
+                      className={`hover:bg-amber-50/70 transition-colors ${
+                        row.hasBoth ? 'bg-indigo-50/30' : row.isZero ? 'bg-slate-50 text-slate-400' : ''
+                      }`}
                     >
                       {/* Código */}
                       <td className="py-2 px-3 font-mono font-bold text-slate-900 border-r border-slate-100">
@@ -769,11 +1067,11 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
                         {row.ajusteDiferenca === 0 ? (
                           <span className="text-slate-400">0</span>
                         ) : row.ajusteDiferenca > 0 ? (
-                          <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                          <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-mono">
                             +{row.ajusteDiferenca} cx (Sobra)
                           </span>
                         ) : (
-                          <span className="text-red-600 bg-red-50 px-2 py-0.5 rounded">
+                          <span className="text-red-700 bg-red-50 px-2 py-0.5 rounded border border-red-200 font-mono">
                             {row.ajusteDiferenca} cx (Falta)
                           </span>
                         )}
@@ -784,15 +1082,17 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
                         {row.ajusteAvarias === 0 ? (
                           <span className="text-slate-400">0</span>
                         ) : (
-                          <span className="text-rose-600 bg-rose-50 px-2 py-0.5 rounded">
+                          <span className="text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 font-mono">
                             -{row.ajusteAvarias} cx
                           </span>
                         )}
                       </td>
 
                       {/* Quantidade Final Grade */}
-                      <td className="py-2 px-3 font-mono font-black text-amber-950 bg-amber-50/50 border-r border-slate-100 text-sm">
-                        {row.quantidadeProduto.toLocaleString('pt-BR')}
+                      <td className="py-2 px-3 font-mono font-black border-r border-slate-100 text-sm">
+                        <span className={row.isZero ? 'text-slate-400' : 'text-amber-950 font-black'}>
+                          {row.quantidadeProduto.toLocaleString('pt-BR')}
+                        </span>
                       </td>
 
                       {/* CodigoGrade */}
@@ -801,8 +1101,36 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
                       </td>
 
                       {/* QuantidadeReserva */}
-                      <td className="py-2 px-3 font-mono text-slate-500">
+                      <td className="py-2 px-3 font-mono text-slate-500 border-r border-slate-100">
                         {row.quantidadeReserva}
+                      </td>
+
+                      {/* Auditoria de Ajustes */}
+                      <td className="py-2 px-3 text-center">
+                        <div className="inline-flex items-center justify-center gap-1 flex-wrap">
+                          {row.hasBoth ? (
+                            <span className="px-2 py-0.5 text-[10px] font-black bg-indigo-100 text-indigo-900 rounded border border-indigo-300">
+                              ⚡ DIF + QUEBRA
+                            </span>
+                          ) : row.hasDiferenca ? (
+                            <span className="px-1.5 py-0.5 text-[9px] font-bold bg-purple-50 text-purple-800 rounded border border-purple-200">
+                              DIF APLICADA
+                            </span>
+                          ) : row.hasAvaria ? (
+                            <span className="px-1.5 py-0.5 text-[9px] font-bold bg-rose-50 text-rose-800 rounded border border-rose-200">
+                              QUEBRA ABATIDA
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-[10px]">
+                              Sem ajuste
+                            </span>
+                          )}
+                          {row.isZero && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-bold bg-slate-200 text-slate-600 rounded">
+                              ZERADO
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -813,12 +1141,17 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
         </div>
 
         {/* RODAPÉ INFORMATIVO DA TABELA */}
-        <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+        <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-600 gap-2">
           <div>
-            Mostrando <strong>{sortedRows.length}</strong> produtos prontos para a grade (itens com quantidade 0 excluídos para evitar rejeição).
+            Mostrando <strong>{sortedRows.length}</strong> de <strong>{rawExportRows.length}</strong> produtos mapeados da 02.05.02.
+            {filterMode === 'grade_valid' && (
+              <span className="ml-1 text-emerald-700 font-semibold">
+                (Apenas itens com saldo &gt; 0 prontos para faturamento/carga no Promax).
+              </span>
+            )}
           </div>
-          <div className="flex items-center gap-3">
-            <span>Fórmula: <strong className="text-slate-700">QuantidadeProduto = Máx(0, Disp020502 + AjusteDIF - Quebras) &gt; 0</strong></span>
+          <div className="flex items-center gap-3 font-mono text-[11px]">
+            <span>Fórmula: <strong className="text-slate-800">QtdGrade = Máx(0, Disp020502 + DIF - Quebras)</strong></span>
           </div>
         </div>
       </div>

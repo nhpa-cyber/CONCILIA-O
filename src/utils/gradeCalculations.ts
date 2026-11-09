@@ -163,6 +163,32 @@ export function calculateExpectedGrade(
       if (val !== 0) diferencasMap.set(code, val);
     });
   }
+  // Se não encontrado em dia, verifica a coluna 13 (Diferença) e 14 (Diferença Congelamento) da 02.05.02
+  if (ecSource && Array.isArray(ecSource.r)) {
+    ecSource.r.forEach((r) => {
+      let code = 0;
+      for (const c of [3, 0, 1, 2]) {
+        const v = String(r[c] || '').trim().replace(/^0+/, '');
+        const n = Number(v);
+        if (!isNaN(n) && n > 10 && n < 99999999) {
+          code = n;
+          break;
+        }
+      }
+      if (code > 0 && !diferencasMap.has(code)) {
+        let colNDif = 0;
+        if (r.length > 13 && r[13] !== undefined && r[13] !== '') {
+          colNDif = parseColL(r[13]);
+        }
+        if (colNDif === 0 && r.length > 14 && r[14] !== undefined && r[14] !== '') {
+          colNDif = parseColL(r[14]);
+        }
+        if (colNDif !== 0) {
+          diferencasMap.set(code, colNDif);
+        }
+      }
+    });
+  }
   if (Array.isArray(data.men)) {
     data.men.forEach((row) => {
       const code = row[0];
