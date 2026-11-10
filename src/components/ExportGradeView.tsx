@@ -186,34 +186,7 @@ export const ExportGradeView: React.FC<ExportGradeViewProps> = ({
       });
     }
 
-    // Prioridade 2: Diferença vinda da própria 02.05.02 (Coluna N / índice 13 ou Coluna O / índice 14)
-    if (ecSource && Array.isArray(ecSource.r)) {
-      ecSource.r.forEach((r) => {
-        let code = 0;
-        for (const c of [3, 0, 1, 2]) {
-          const v = String(r[c] || '').trim().replace(/^0+/, '');
-          const n = Number(v);
-          if (!isNaN(n) && n > 10 && n < 99999999) {
-            code = n;
-            break;
-          }
-        }
-        if (code > 0 && map[code] === undefined) {
-          let colNDif = 0;
-          if (r.length > 13 && r[13] !== undefined && r[13] !== '') {
-            colNDif = parseColL(r[13]);
-          }
-          if (colNDif === 0 && r.length > 14 && r[14] !== undefined && r[14] !== '') {
-            colNDif = parseColL(r[14]);
-          }
-          if (colNDif !== 0) {
-            map[code] = colNDif;
-          }
-        }
-      });
-    }
-
-    // Prioridade 3: data.men (DIF Mensal - busca último dia preenchido)
+    // Prioridade 2: data.men (DIF Mensal - busca último dia preenchido)
     if (Array.isArray(data.men)) {
       data.men.forEach((row) => {
         const code = row[0];
